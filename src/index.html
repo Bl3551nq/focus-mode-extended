@@ -363,8 +363,31 @@ body.editing .icon-btn::after{
 .card.light .picker-item span{ color:rgba(0,0,0,0.35); }
 
 /* ═══════════════════════════════════════════════════════
-   DRAG CORNER (bottom-left move handle)
+   UPDATE BANNER
 ═══════════════════════════════════════════════════════ */
+.update-banner{
+  position:absolute; bottom:14px; left:14px; right:14px;
+  z-index:60;
+  background:linear-gradient(135deg,rgba(100,40,220,0.95),rgba(180,30,80,0.95));
+  border-radius:14px;
+  padding:10px 14px;
+  display:none; align-items:center; justify-content:space-between; gap:8px;
+  border:1px solid rgba(255,255,255,0.12);
+  box-shadow:0 4px 20px rgba(0,0,0,0.4);
+  animation:pickerIn 0.3s cubic-bezier(0.34,1.3,0.64,1) both;
+}
+.update-banner.show{ display:flex; }
+.update-banner-text{ font-size:11px; color:#fff; font-weight:500; line-height:1.4; }
+.update-banner-text span{ opacity:0.7; font-size:10px; display:block; }
+.update-install-btn{
+  background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.3);
+  color:#fff; font-size:11px; font-weight:600; border-radius:8px;
+  padding:5px 10px; cursor:pointer; white-space:nowrap; flex-shrink:0;
+  transition:background 0.15s;
+}
+.update-install-btn:hover{ background:rgba(255,255,255,0.35); }
+.update-install-btn.downloading{ opacity:0.6; pointer-events:none; }
+.card.light .update-banner{ background:linear-gradient(135deg,rgba(80,20,200,0.95),rgba(160,10,60,0.95)); }
 .drag-corner{
   position:absolute; bottom:0; left:0;
   width:34px; height:34px;
@@ -384,6 +407,15 @@ body.editing .icon-btn::after{
 
   <!-- Drag handle bottom-left -->
   <div class="drag-corner" id="drag-corner"></div>
+
+  <!-- Update banner -->
+  <div class="update-banner" id="update-banner">
+    <div class="update-banner-text">
+      Update available
+      <span id="update-version"></span>
+    </div>
+    <button class="update-install-btn" id="update-install-btn" onclick="installUpdate()">Install</button>
+  </div>
 
   <!-- Top bar: theme switch | minimize pill | edit button -->
   <div class="top-bar">
@@ -728,11 +760,11 @@ function switchMode(mode,btn){
   setTimeout(()=>{t.textContent=MODES[mode].title;renderOptions(mode);t.classList.remove('switching');l.classList.remove('switching');},180);
 }
 
-/* ─── Proportional scale from center ─────────────────── */
+/* ─── Pixel-perfect zoom via CSS zoom + window resize ── */
 (function(){
   const handle = document.getElementById('resize-handle');
   const card   = document.getElementById('card');
-  const MIN_S  = 0.55, MAX_S = 1.8;
+  const MIN_S  = 0.6, MAX_S = 1.8;
   let dragging = false, startX = 0, startS = 1, animCleared = false;
 
   window._cardScale   = 1;
@@ -741,46 +773,43 @@ function switchMode(mode,btn){
   function clearAnim(){
     if(animCleared) return;
     animCleared = true;
-    card.style.animation = 'none';   // free transform from cardIn fill
+    card.style.animation = 'none';
   }
 
-  function applyScale(s){
+  function applyZoom(s){
     s = Math.min(MAX_S, Math.max(MIN_S, +s.toFixed(4)));
-    window._cardScale        = s;
-    card.style.transform      = `scale(${s})`;
-    card.style.transformOrigin = '50% 50%';
+    window._cardScale = s;
+    // CSS zoom re-renders at native resolution — always sharp
+    card.style.zoom = s;
+    // Tell main process to resize the window to match
+    if (window.electronAPI) window.electronAPI.setZoom(s);
     localStorage.setItem('fm_scale', s);
   }
 
-  window._applyScale = applyScale;
+  window._applyScale = applyZoom;
 
-  // restore after animation finishes
   card.addEventListener('animationend', () => {
     clearAnim();
-    try{
+    try {
       const saved = parseFloat(localStorage.getItem('fm_scale'));
-      if(saved >= MIN_S && saved <= MAX_S) applyScale(saved);
-    }catch(e){}
-  }, {once:true});
+      if (saved >= MIN_S && saved <= MAX_S) applyZoom(saved);
+    } catch(e){}
+  }, {once: true});
 
-  function currentScale(){
-    const t = card.style.transform;
-    if(!t) return 1;
-    const m = t.match(/scale\(([^)]+)\)/);
-    return m ? parseFloat(m[1]) : 1;
+  function currentZoom(){
+    return parseFloat(card.style.zoom) || 1;
   }
 
   function beginDrag(x){
-    clearAnim();                           // ensure animation won't fight us
+    clearAnim();
     dragging = true;
-    startX   = x;
-    startS   = currentScale();
+    startX = x;
+    startS = currentZoom();
     document.body.style.userSelect = 'none';
   }
   function moveDrag(x){
     if(!dragging) return;
-    // 300px drag = 1.0 scale unit; left = bigger, right = smaller
-    applyScale(startS + (startX - x) / 300);
+    applyZoom(startS + (startX - x) / 300);
   }
   function endDrag(){
     if(!dragging) return;
@@ -802,21 +831,41 @@ function switchMode(mode,btn){
   document.addEventListener('touchend', endDrag);
 })();
 
-/* ─── Drag window via Electron IPC ───────────────────── */
+/* ─── Auto-updater UI ───────────────────────────────── */
+function installUpdate(){
+  const btn = document.getElementById('update-install-btn');
+  btn.textContent = 'Installing…';
+  btn.classList.add('downloading');
+  if (window.electronAPI) window.electronAPI.installUpdate();
+}
+
+if (window.electronAPI) {
+  window.electronAPI.onUpdateAvailable((version) => {
+    const banner = document.getElementById('update-banner');
+    const vEl    = document.getElementById('update-version');
+    if (vEl) vEl.textContent = `v${version} — downloading…`;
+    if (banner) banner.classList.add('show');
+  });
+  window.electronAPI.onUpdateDownloaded(() => {
+    const btn = document.getElementById('update-install-btn');
+    const vEl = document.getElementById('update-version');
+    if (btn) btn.textContent = 'Restart & Install';
+    if (vEl) vEl.textContent = 'Ready to install';
+  });
+}
 (function(){
   const grip = document.getElementById('drag-corner');
   if (!grip) return;
-
   let dragging = false;
 
-  function beginDrag(x, y) {
+  function beginDrag() {
     dragging = true;
-    if (window.electronAPI) window.electronAPI.dragStart(x, y);
+    if (window.electronAPI) window.electronAPI.dragStart();
     document.body.style.userSelect = 'none';
   }
-  function moveDrag(x, y) {
+  function moveDrag() {
     if (!dragging) return;
-    if (window.electronAPI) window.electronAPI.dragMove(x, y);
+    if (window.electronAPI) window.electronAPI.dragMove();
   }
   function endDrag() {
     if (!dragging) return;
@@ -825,17 +874,12 @@ function switchMode(mode,btn){
     document.body.style.userSelect = '';
   }
 
-  grip.addEventListener('mousedown',  e => { beginDrag(e.screenX, e.screenY); e.preventDefault(); });
-  document.addEventListener('mousemove', e => moveDrag(e.screenX, e.screenY));
+  grip.addEventListener('mousedown',  e => { beginDrag(); e.preventDefault(); });
+  document.addEventListener('mousemove', () => moveDrag());
   document.addEventListener('mouseup',   endDrag);
 
-  grip.addEventListener('touchstart', e => {
-    beginDrag(e.touches[0].screenX, e.touches[0].screenY); e.preventDefault();
-  }, {passive:false});
-  document.addEventListener('touchmove', e => {
-    if (!dragging) return;
-    moveDrag(e.touches[0].screenX, e.touches[0].screenY); e.preventDefault();
-  }, {passive:false});
+  grip.addEventListener('touchstart', e => { beginDrag(); e.preventDefault(); }, {passive:false});
+  document.addEventListener('touchmove', e => { if(dragging){ moveDrag(); e.preventDefault(); } }, {passive:false});
   document.addEventListener('touchend', endDrag);
 })();
 
