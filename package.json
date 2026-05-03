@@ -10,27 +10,20 @@
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
-    "start":  "electron .",
-    "build":  "electron-builder --win nsis",
-    "build:portable": "electron-builder --win portable"
+    "start": "electron .",
+    "build": "electron-builder --win nsis"
   },
   "devDependencies": {
-    "electron":         "^31.0.0",
+    "electron": "^31.0.0",
     "electron-builder": "^24.13.3"
   },
   "dependencies": {
     "electron-updater": "^6.3.9"
   },
   "build": {
-    "appId":       "com.novavault.focusmodeextended",
+    "appId": "com.novavault.focusmodeextended",
     "productName": "Focus Mode Extended",
-    "copyright":   "Copyright © 2025 Nova Vault",
-    "publish": {
-      "provider": "github",
-      "owner":    "BI3551nq",
-      "repo":     "focus-mode-extended",
-      "private":  false
-    },
+    "copyright": "Copyright © 2025 Nova Vault",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -39,8 +32,7 @@
       "main.js",
       "preload.js",
       "src/**/*",
-      "build/icon.ico",
-      "!node_modules/**/*"
+      "build/icon.ico"
     ],
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
