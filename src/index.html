@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="transparent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Focus Mode">
+<title>Focus Mode</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+html, body {
+  width:100%; height:100%;
+  display:flex; align-items:center; justify-content:center;
+  overflow:clip;
+  font-family:-apple-system,'Helvetica Neue',sans-serif;
+  user-select:none;
+  background: transparent;
+}
+
+/* ═══════════════════════════════════════════════════════
+   CARD
+═══════════════════════════════════════════════════════ */
+.card {
+  position:relative; z-index:10;
+  width:320px;
+  border-radius:28px;
+  padding:14px 20px 14px;
+  background:rgba(18,14,30,0.96);
+  border:1px solid rgba(255,255,255,0.08);
+  box-shadow:
+    0 4px 24px rgba(0,0,0,0.6),
+    0 16px 48px rgba(0,0,0,0.5),
+    0 0 0 1px rgba(255,255,255,0.04);
+  display:flex; flex-direction:column;
+  animation:cardIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+  transform-origin: 50% 50%;
+  flex-shrink: 0;
+  will-change: transform;
+  --accent:      rgba(110,0,210,0.9);
+  --accent-soft: rgba(130,0,255,0.18);
+  /* theme tokens — dark defaults */
+  --bg:          rgba(28,28,34,0.88);
+  --text:        #ffffff;
+  --text-dim:    rgba(255,255,255,0.4);
+  --text-mid:    rgba(255,255,255,0.75);
+  --divider:     rgba(255,255,255,0.09);
+  --icon-idle:   rgba(255,255,255,0.07);
+  --opt-hover:   rgba(255,255,255,0.07);
+  --opt-active:  rgba(255,255,255,0.09);
+  --pill:        rgba(255,255,255,0.18);
+  --input-bg:    rgba(255,255,255,0.08);
+  --input-border:rgba(255,255,255,0.22);
+  --del-bg:      rgba(255,50,50,0.18);
+  --del-color:   rgba(255,110,110,0.9);
+  --add-color:   rgba(255,255,255,0.28);
+  --add-border:  rgba(255,255,255,0.1);
+  --edit-bg:     rgba(255,255,255,0.07);
+  --edit-hover:  rgba(255,255,255,0.14);
+}
+@keyframes cardIn{from{opacity:0;transform:scale(0.9) translateY(10px);}to{opacity:1;transform:scale(1) translateY(0);}}
+
+/* ── Light mode overrides ───────────────────────────── */
+.card.light {
+  background:rgba(245,245,250,0.98);
+  border:1px solid rgba(0,0,0,0.08);
+  box-shadow:
+    0 4px 24px rgba(0,0,0,0.15),
+    0 16px 48px rgba(0,0,0,0.12);
+  --text:        #111111;
+  --text-dim:    rgba(0,0,0,0.35);
+  --text-mid:    rgba(0,0,0,0.7);
+  --divider:     rgba(0,0,0,0.08);
+  --icon-idle:   rgba(0,0,0,0.06);
+  --opt-hover:   rgba(0,0,0,0.05);
+  --opt-active:  rgba(0,0,0,0.08);
+  --pill:        rgba(0,0,0,0.15);
+  --input-bg:    rgba(0,0,0,0.05);
+  --input-border:rgba(0,0,0,0.18);
+  --del-bg:      rgba(200,0,0,0.10);
+  --del-color:   rgba(180,0,0,0.85);
+  --add-color:   rgba(0,0,0,0.25);
+  --add-border:  rgba(0,0,0,0.12);
+  --edit-bg:     rgba(0,0,0,0.06);
+  --edit-hover:  rgba(0,0,0,0.12);
+}
+
+/* ═══════════════════════════════════════════════════════
+   TOP BAR  (theme toggle LEFT · minimize pill CENTER · edit RIGHT)
+═══════════════════════════════════════════════════════ */
+.top-bar{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:14px; flex-shrink:0; position:relative;
+}
+
+/* ── Theme toggle switch ──── */
+.theme-switch{
+  width:42px; height:24px; border-radius:99px;
+  background:rgba(255,255,255,0.12);
+  border:1px solid rgba(255,255,255,0.1);
+  cursor:pointer; position:relative;
+  transition:background 0.3s, border-color 0.3s;
+  flex-shrink:0;
+}
+.card.light .theme-switch{
+  background:rgba(0,0,0,0.10);
+  border-color:rgba(0,0,0,0.10);
+}
+.theme-switch-knob{
+  position:absolute; top:3px; left:3px;
+  width:16px; height:16px; border-radius:50%;
+  background:#fff;
+  box-shadow:0 1px 4px rgba(0,0,0,0.35);
+  transition:transform 0.28s cubic-bezier(0.34,1.56,0.64,1), background 0.3s;
+  display:flex; align-items:center; justify-content:center;
+}
+.theme-switch-knob svg{width:9px;height:9px;fill:none;stroke:#888;stroke-width:1.8;stroke-linecap:round;}
+.card.light .theme-switch-knob{
+  transform:translateX(18px);
+  background:#1a1a2e;
+}
+.card.light .theme-switch-knob svg{ stroke:#ccc; }
+/* sun icon in dark, moon in light — toggled via JS */
+
+/* ── Minimize pill center ─── */
+.minimize-bar{
+  position:absolute; left:50%; transform:translateX(-50%);
+  padding:4px 10px; cursor:pointer;
+}
+.minimize-pill{
+  width:36px; height:4px; border-radius:99px;
+  background:var(--pill);
+  transition:background 0.2s, width 0.2s;
+}
+.minimize-bar:hover .minimize-pill{ width:46px; background:rgba(150,100,255,0.55); }
+.card.minimized .minimize-pill{ background:var(--accent); box-shadow:0 0 8px 2px var(--accent-soft); width:44px; }
+
+/* ── Edit button right ───── */
+.edit-toggle{
+  width:30px; height:30px; border-radius:50%;
+  background:var(--edit-bg); border:1px solid transparent;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  color:var(--text-dim); transition:all 0.2s ease; flex-shrink:0;
+}
+.edit-toggle:hover,.edit-toggle:active{ background:var(--edit-hover); color:var(--text); }
+.edit-toggle.on{ background:var(--accent); color:#fff; }
+.edit-toggle svg{ width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round; }
+
+/* ═══════════════════════════════════════════════════════
+   ICONS
+═══════════════════════════════════════════════════════ */
+.icons{ display:flex; justify-content:space-evenly; align-items:center; margin-bottom:16px; flex-shrink:0; width:100%; }
+.icon-btn{
+  width:50px; height:50px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--icon-idle); border:1px solid transparent;
+  cursor:pointer; color:var(--text-dim);
+  transition:all 0.25s cubic-bezier(0.34,1.56,0.64,1); flex-shrink:0;
+}
+.icon-btn svg{ width:22px; height:22px; fill:currentColor; }
+.icon-btn:nth-child(1){--glow:rgba(255,40,100,0.5);  --glowfade:rgba(255,40,100,0.12); --ibg:rgba(215,25,75,0.9);}
+.icon-btn:nth-child(2){--glow:rgba(170,0,255,0.5);   --glowfade:rgba(170,0,255,0.12);  --ibg:rgba(140,0,225,0.9);}
+.icon-btn:nth-child(3){--glow:rgba(255,30,110,0.5);  --glowfade:rgba(255,30,110,0.12); --ibg:rgba(205,15,95,0.9);}
+.icon-btn:nth-child(4){--glow:rgba(130,0,255,0.5);   --glowfade:rgba(130,0,255,0.12);  --ibg:rgba(110,0,210,0.9);}
+.icon-btn:nth-child(5){--glow:rgba(0,210,180,0.5);   --glowfade:rgba(0,210,180,0.12);  --ibg:rgba(0,180,155,0.9);}
+.icon-btn:active{ background:var(--glowfade); color:#fff; transform:scale(0.95); }
+.icon-btn.active{
+  background:var(--ibg); color:#fff; transform:scale(1.06);
+  animation:glowPulse 2.4s ease-in-out infinite;
+}
+@keyframes glowPulse{
+  0%,100%{box-shadow:0 0 10px 2px var(--glow),0 0 22px 4px var(--glowfade);}
+  50%    {box-shadow:0 0 16px 4px var(--glow),0 0 32px 8px var(--glowfade);}
+}
+
+/* ═══════════════════════════════════════════════════════
+   TITLE
+═══════════════════════════════════════════════════════ */
+.mode-label{ font-size:10px; font-weight:500; color:var(--text-dim); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:3px; flex-shrink:0; }
+.title-wrap{ margin-bottom:12px; flex-shrink:0; }
+.title{ font-size:28px; font-weight:700; color:var(--text); letter-spacing:-0.02em; line-height:1.1; display:inline-block; min-width:40px; border-radius:8px; transition:opacity 0.18s,transform 0.18s,color 0.3s; cursor:default; }
+.title.editable{ cursor:text; }
+.title.editable:hover{ background:var(--opt-hover); padding:0 5px; margin:0 -5px; }
+.title.switching{ opacity:0; transform:translateY(4px); }
+.title-input{ font-size:28px; font-weight:700; color:var(--text); letter-spacing:-0.02em; background:var(--input-bg); border:1px solid var(--input-border); border-radius:9px; padding:1px 9px; outline:none; width:100%; caret-color:var(--text); display:none; }
+
+/* ═══════════════════════════════════════════════════════
+   OPTIONS
+═══════════════════════════════════════════════════════ */
+.divider{ height:0.5px; background:var(--divider); margin-bottom:0; flex-shrink:0; }
+
+.scroll-area{
+  overflow-y:auto; overflow-x:hidden;
+  padding-top:2px; padding-bottom:4px; padding-right:6px;
+  height:176px; flex-shrink:0;
+  scrollbar-width:none;
+}
+.scroll-area::-webkit-scrollbar{ width:4px; }
+.scroll-area::-webkit-scrollbar-track{ background:transparent; border-radius:99px; }
+.scroll-area::-webkit-scrollbar-thumb{ background:transparent; border-radius:99px; }
+.scroll-area:hover{ scrollbar-width:thin; scrollbar-color:var(--accent) transparent; }
+.scroll-area:hover::-webkit-scrollbar-track{ background:var(--opt-hover); }
+.scroll-area:hover::-webkit-scrollbar-thumb{ background:var(--accent); box-shadow:0 0 6px 1px var(--accent-soft); }
+.scroll-area:hover::-webkit-scrollbar-thumb:hover{ background:var(--text); }
+
+.options{ list-style:none; display:flex; flex-direction:column; transition:opacity 0.18s; }
+.options.switching{ opacity:0; }
+
+.option{
+  display:flex; align-items:center; gap:8px;
+  padding:11px 10px; border-radius:12px;
+  font-size:15px; font-weight:400; color:var(--text-mid);
+  cursor:pointer; transition:background 0.15s; letter-spacing:-0.01em;
+}
+.option:hover{ background:var(--opt-hover); }
+.option:active{ background:var(--opt-active); }
+.option.selected{
+  background:var(--accent-soft);
+  border:1px solid transparent;
+  font-weight:600; color:var(--text);
+  padding:14px 10px;
+}
+.check{ width:15px; height:15px; flex-shrink:0; opacity:0; color:var(--accent); }
+.option.selected .check{ opacity:1; }
+.check svg{ width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:3.8;stroke-linecap:round;stroke-linejoin:round; }
+
+.opt-text{ flex:1; min-width:0; }
+.opt-input{ flex:1; font-size:15px; font-weight:400; color:var(--text); background:var(--input-bg); border:1px solid var(--input-border); border-radius:7px; padding:2px 7px; outline:none; caret-color:var(--text); display:none; min-width:0; }
+
+.del-btn{ width:20px;height:20px;border-radius:50%;background:var(--del-bg);border:none;cursor:pointer;display:none;align-items:center;justify-content:center;color:var(--del-color);flex-shrink:0;font-size:14px;line-height:1;transition:background 0.15s; }
+.add-btn{ display:none;align-items:center;gap:8px;padding:10px;border-radius:12px;font-size:14px;color:var(--add-color);cursor:pointer;border:1.5px dashed var(--add-border);background:transparent;width:100%;text-align:left;transition:all 0.15s;margin-top:5px; }
+.add-btn svg{ width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0; }
+
+body.editing .del-btn{ display:flex; }
+body.editing .add-btn{ display:flex; }
+body.editing .option{ cursor:default; }
+
+/* Minimized */
+.card.minimized .scroll-area,
+.card.minimized .divider,
+.card.minimized .title-wrap,
+.card.minimized .mode-label{ display:none; }
+.card.minimized{ padding-bottom:10px; }
+
+/* ═══════════════════════════════════════════════════════
+   RESIZE HANDLE (left side)
+═══════════════════════════════════════════════════════ */
+.resize-handle{
+  position:absolute;
+  left:-10px; top:50%; transform:translateY(-50%);
+  width:10px; height:50px; border-radius:6px 0 0 6px;
+  background:var(--accent);
+  opacity:0.35;
+  cursor:ew-resize;
+  transition:opacity 0.2s, width 0.2s;
+  display:flex; align-items:center; justify-content:center;
+}
+.resize-handle::after{
+  content:'';
+  width:2px; height:22px; border-radius:99px;
+  background:rgba(255,255,255,0.6);
+  box-shadow:4px 0 0 rgba(255,255,255,0.6);
+}
+.resize-handle:hover{ opacity:0.85; width:12px; }
+
+/* ═══════════════════════════════════════════════════════
+   TOP-BAR RIGHT GROUP
+═══════════════════════════════════════════════════════ */
+.top-bar-right{ display:flex; align-items:center; gap:5px; flex-shrink:0; }
+
+/* ── Close button ─────────────────────────────────── */
+.close-btn{
+  width:30px; height:30px; border-radius:50%;
+  background:var(--edit-bg); border:1px solid transparent;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  color:var(--text-dim); transition:all 0.2s ease; flex-shrink:0;
+}
+.close-btn:hover,.close-btn:active{ background:rgba(255,50,50,0.2); color:rgba(255,110,110,0.9); }
+.close-btn svg{ width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round; }
+
+/* ═══════════════════════════════════════════════════════
+   ICON EDIT INDICATOR (dot badge in edit mode)
+═══════════════════════════════════════════════════════ */
+body.editing .icon-btn{ position:relative; }
+body.editing .icon-btn::after{
+  content:'';
+  position:absolute; top:-2px; right:-2px;
+  width:10px; height:10px; border-radius:50%;
+  background:var(--accent);
+  border:1.5px solid rgba(14,14,20,0.9);
+  pointer-events:none;
+  animation:dotPop 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.card.light .icon-btn::after{ border-color:rgba(245,245,250,0.95); }
+@keyframes dotPop{ from{transform:scale(0);} to{transform:scale(1);} }
+
+/* ═══════════════════════════════════════════════════════
+   ICON PICKER OVERLAY
+═══════════════════════════════════════════════════════ */
+.icon-picker{
+  position:absolute; inset:0; z-index:50;
+  border-radius:28px;
+  background:rgba(13,11,22,0.97);
+  display:none; flex-direction:column;
+  padding:13px 14px 12px;
+}
+.icon-picker.open{
+  display:flex;
+  animation:pickerIn 0.22s cubic-bezier(0.34,1.3,0.64,1) both;
+}
+@keyframes pickerIn{ from{opacity:0;transform:scale(0.95);} to{opacity:1;transform:scale(1);} }
+
+.picker-header{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:10px; flex-shrink:0;
+}
+.picker-title{
+  font-size:10px; font-weight:600; color:rgba(255,255,255,0.35);
+  letter-spacing:0.12em; text-transform:uppercase;
+}
+.picker-close{
+  width:24px; height:24px; border-radius:50%;
+  background:rgba(255,255,255,0.08); border:none;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  color:rgba(255,255,255,0.35); transition:all 0.15s;
+}
+.picker-close:hover{ background:rgba(255,50,50,0.22); color:rgba(255,110,110,0.9); }
+.picker-close svg{ width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round; }
+
+.picker-grid{
+  display:grid; grid-template-columns:repeat(5,1fr); gap:5px;
+  overflow-y:auto; flex:1; scrollbar-width:none;
+}
+.picker-grid::-webkit-scrollbar{ display:none; }
+
+.picker-item{
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  padding:9px 3px 7px; border-radius:10px;
+  cursor:pointer; transition:background 0.15s;
+  border:1px solid transparent;
+}
+.picker-item:hover{ background:rgba(255,255,255,0.07); }
+.picker-item.current{
+  background:var(--accent-soft);
+  border-color:rgba(150,80,255,0.3);
+}
+.picker-item svg{ width:19px; height:19px; flex-shrink:0; color:rgba(255,255,255,0.85); }
+.picker-item span{
+  font-size:7.5px; color:rgba(255,255,255,0.3); text-align:center;
+  letter-spacing:0.02em; line-height:1.2; white-space:nowrap; overflow:hidden; max-width:100%;
+}
+
+/* Light mode picker */
+.card.light .icon-picker{ background:rgba(237,236,248,0.98); }
+.card.light .picker-title{ color:rgba(0,0,0,0.35); }
+.card.light .picker-close{ background:rgba(0,0,0,0.07); color:rgba(0,0,0,0.35); }
+.card.light .picker-close:hover{ background:rgba(200,0,0,0.1); color:rgba(180,0,0,0.85); }
+.card.light .picker-item:hover{ background:rgba(0,0,0,0.05); }
+.card.light .picker-item svg{ color:rgba(0,0,0,0.65); }
+.card.light .picker-item span{ color:rgba(0,0,0,0.35); }
+
+/* ═══════════════════════════════════════════════════════
+   DRAG CORNER (bottom-left move handle)
+═══════════════════════════════════════════════════════ */
+.drag-corner{
+  position:absolute; bottom:0; left:0;
+  width:34px; height:34px;
+  border-radius:0 0 0 28px;
+  cursor:grab; z-index:20;
+}
+.drag-corner:active{ cursor:grabbing; }
+.card.minimized .drag-corner{ border-radius:0 0 0 28px; }
+</style>
+</head>
+<body>
+
+<div class="card" id="card">
+
+  <!-- Resize handle on the left -->
+  <div class="resize-handle" id="resize-handle"></div>
+
+  <!-- Drag handle bottom-left -->
+  <div class="drag-corner" id="drag-corner"></div>
+
+  <!-- Top bar: theme switch | minimize pill | edit button -->
+  <div class="top-bar">
+
+    <!-- Theme toggle (left) -->
+    <div class="theme-switch" id="theme-switch" onclick="toggleTheme()">
+      <div class="theme-switch-knob" id="theme-knob">
+        <!-- sun icon (dark mode) -->
+        <svg id="theme-icon" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Minimize pill (center — absolute) -->
+    <div class="minimize-bar" onclick="toggleMinimize()">
+      <div class="minimize-pill"></div>
+    </div>
+
+    <!-- Right controls: close + edit -->
+    <div class="top-bar-right">
+      <button class="close-btn" id="close-btn" onclick="closeCard()">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <button class="edit-toggle" id="edit-toggle" onclick="toggleEdit()">
+        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Icons -->
+  <div class="icons">
+    <button class="icon-btn" data-mode="target" onclick="handleIconClick('target',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+        <circle cx="12" cy="12" r="8.5"/>
+        <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>
+        <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
+        <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+      </svg>
+    </button>
+    <button class="icon-btn" data-mode="candle" onclick="handleIconClick('candle',this)">
+      <svg viewBox="0 0 24 24" fill="currentColor" stroke-width="0">
+        <rect x="4.2" y="4" width="1.3" height="4" rx="0.6"/>
+        <rect x="3" y="8" width="3.8" height="6" rx="0.8"/>
+        <rect x="4.2" y="14" width="1.3" height="3" rx="0.6"/>
+        <rect x="10.4" y="2" width="1.3" height="5" rx="0.6"/>
+        <rect x="9.2" y="7" width="3.8" height="8" rx="0.8"/>
+        <rect x="10.4" y="15" width="1.3" height="4" rx="0.6"/>
+        <rect x="16.6" y="6" width="1.3" height="4" rx="0.6"/>
+        <rect x="15.4" y="10" width="3.8" height="5" rx="0.8"/>
+        <rect x="16.6" y="15" width="1.3" height="4" rx="0.6"/>
+      </svg>
+    </button>
+    <button class="icon-btn" data-mode="dollar" onclick="handleIconClick('dollar',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="1" x2="12" y2="23"/>
+        <path d="M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/>
+      </svg>
+    </button>
+    <button class="icon-btn active" data-mode="sync" onclick="handleIconClick('sync',this)">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2L4 6v6c0 5.25 3.5 9.74 8 11 4.5-1.26 8-5.75 8-11V6L12 2z" opacity="0.9"/>
+        <rect x="9.2" y="9" width="2" height="6" rx="0.6" fill="#fff" opacity="0.85"/>
+        <rect x="12.8" y="9" width="2" height="6" rx="0.6" fill="#fff" opacity="0.85"/>
+      </svg>
+    </button>
+    <button class="icon-btn" data-mode="alerts" onclick="handleIconClick('alerts',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Icon Picker Overlay -->
+  <div class="icon-picker" id="icon-picker">
+    <div class="picker-header">
+      <span class="picker-title">Icon Glossary</span>
+      <button class="picker-close" onclick="closePicker()">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="picker-grid" id="picker-grid"></div>
+  </div>
+
+  <!-- Title -->
+  <p class="mode-label">Mode</p>
+  <div class="title-wrap">
+    <h1 class="title" id="mode-title">Do Not Disturb</h1>
+    <input class="title-input" id="title-input" type="text"
+      onblur="commitTitle()" onkeydown="if(event.key==='Enter')this.blur()"/>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="scroll-area">
+    <ul class="options" id="options-list"></ul>
+    <button class="add-btn" onclick="addOption()">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add option
+    </button>
+  </div>
+
+</div>
+
+<script>
+/* ─── State ─────────────────────────────────────────── */
+let currentMode='sync', editMode=false, isLight=false;
+
+/* ─── Icon Library (Glossary) ───────────────────────── */
+const ICON_LIBRARY = {
+  target:       { label:'Target',    svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>` },
+  candle:       { label:'Candles',   svg:`<svg viewBox="0 0 24 24" fill="currentColor"><rect x="4.2" y="4" width="1.3" height="4" rx="0.6"/><rect x="3" y="8" width="3.8" height="6" rx="0.8"/><rect x="4.2" y="14" width="1.3" height="3" rx="0.6"/><rect x="10.4" y="2" width="1.3" height="5" rx="0.6"/><rect x="9.2" y="7" width="3.8" height="8" rx="0.8"/><rect x="10.4" y="15" width="1.3" height="4" rx="0.6"/><rect x="16.6" y="6" width="1.3" height="4" rx="0.6"/><rect x="15.4" y="10" width="3.8" height="5" rx="0.8"/><rect x="16.6" y="15" width="1.3" height="4" rx="0.6"/></svg>` },
+  dollar:       { label:'Dollar',    svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/></svg>` },
+  shield:       { label:'DND',       svg:`<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 6v6c0 5.25 3.5 9.74 8 11 4.5-1.26 8-5.75 8-11V6L12 2z" opacity="0.9"/><rect x="9.2" y="9" width="2" height="6" rx="0.6" fill="#fff" opacity="0.85"/><rect x="12.8" y="9" width="2" height="6" rx="0.6" fill="#fff" opacity="0.85"/></svg>` },
+  bell:         { label:'Alerts',    svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>` },
+  trending_up:  { label:'Bull',      svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>` },
+  trending_dn:  { label:'Bear',      svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>` },
+  activity:     { label:'Signal',    svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>` },
+  bar_chart:    { label:'Bars',      svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>` },
+  line_chart:   { label:'Line',      svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 8 11 12 14 16 7 20 10"/><line x1="4" y1="21" x2="20" y2="21"/></svg>` },
+  percent:      { label:'Percent',   svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>` },
+  pie:          { label:'Portfolio', svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>` },
+  bitcoin:      { label:'Crypto',    svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h6a3 3 0 0 1 0 6H7V7z"/><path d="M7 13h6.5a3 3 0 0 1 0 6H7V13z"/><line x1="9" y1="4" x2="9" y2="7"/><line x1="14" y1="4" x2="14" y2="7"/><line x1="9" y1="19" x2="9" y2="22"/><line x1="14" y1="19" x2="14" y2="22"/></svg>` },
+  wallet:       { label:'Wallet',    svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4h-4z"/></svg>` },
+  clock:        { label:'Clock',     svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 15.5"/></svg>` },
+  calendar:     { label:'Calendar',  svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>` },
+  lock:         { label:'Lock',      svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>` },
+  star:         { label:'Star',      svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>` },
+  lightning:    { label:'Flash',     svg:`<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4.09 12.8c-.36.44-.56.99-.56 1.56 0 1.38 1.12 2.5 2.5 2.5H11l-1 6.5L19.91 11.2c.36-.44.56-.99.56-1.56 0-1.38-1.12-2.5-2.5-2.5H13l1-6.14z"/></svg>` },
+  eye:          { label:'Watch',     svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>` },
+  flag:         { label:'Flag',      svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>` },
+  bookmark:     { label:'Saves',     svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>` },
+  layers:       { label:'Layers',    svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>` },
+  settings:     { label:'Config',    svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>` },
+  fire:         { label:'Hot',       svg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>` },
+};
+
+/* ─── Icon Assignments (mode → icon key) ────────────── */
+let iconAssignments = {
+  target:'target', candle:'candle', dollar:'dollar', sync:'shield', alerts:'bell'
+};
+
+/* ─── Picker state ──────────────────────────────────── */
+let pickerTarget = null;
+
+function handleIconClick(mode, btn){
+  if(editMode) openPicker(mode, btn);
+  else switchMode(mode, btn);
+}
+
+function openPicker(mode){
+  pickerTarget = mode;
+  const grid = document.getElementById('picker-grid');
+  const current = iconAssignments[mode];
+  grid.innerHTML = '';
+  Object.entries(ICON_LIBRARY).forEach(([key, def]) => {
+    const item = document.createElement('div');
+    item.className = 'picker-item' + (key === current ? ' current' : '');
+    item.innerHTML = def.svg + `<span>${def.label}</span>`;
+    item.addEventListener('click', () => assignIcon(mode, key));
+    grid.appendChild(item);
+  });
+  document.getElementById('icon-picker').classList.add('open');
+}
+
+function closePicker(){
+  document.getElementById('icon-picker').classList.remove('open');
+  pickerTarget = null;
+}
+
+function assignIcon(mode, iconKey){
+  iconAssignments[mode] = iconKey;
+  const btn = document.querySelector(`.icon-btn[data-mode="${mode}"]`);
+  if(btn) btn.innerHTML = ICON_LIBRARY[iconKey].svg;
+  if(window._afterRender) window._afterRender();
+  closePicker();
+  autoSave();
+}
+
+function initIcons(){
+  Object.entries(iconAssignments).forEach(([mode, iconKey]) => {
+    const btn = document.querySelector(`.icon-btn[data-mode="${mode}"]`);
+    if(btn && ICON_LIBRARY[iconKey]) btn.innerHTML = ICON_LIBRARY[iconKey].svg;
+  });
+}
+
+/* ─── Close card ────────────────────────────────────── */
+function closeCard(){
+  const card = document.getElementById('card');
+  card.style.transition = 'opacity 0.28s ease, transform 0.28s ease';
+  card.style.opacity    = '0';
+  card.style.transform  = 'scale(0.88)';
+  setTimeout(() => card.style.display = 'none', 290);
+}
+
+const MODES={
+  target:{title:'Precision',      accent:'rgba(215,25,75,0.9)',  soft:'rgba(255,40,100,0.16)',  options:['Scalping session','Sniper entry only','Wait for confluence','HTF confirmation']},
+  candle:{title:'Analysis',       accent:'rgba(140,0,225,0.9)',  soft:'rgba(170,0,255,0.16)',   options:['1H candlestick review','4H structure check','Daily bias','Weekly trend']},
+  dollar:{title:'Risk & P&L',     accent:'rgba(205,15,95,0.9)',  soft:'rgba(255,30,110,0.16)',  options:['1% risk per trade','Review open P&L','Set daily loss limit','Check margin level']},
+  sync:  {title:'Do Not Disturb', accent:'rgba(110,0,210,0.9)',  soft:'rgba(130,0,255,0.16)',   options:['For an hour','For Today','Until This Weekend','Until Goals Met']},
+  alerts:{title:'Alerts',         accent:'rgba(0,180,155,0.9)',   soft:'rgba(0,210,180,0.18)',   options:['NFP release','FOMC statement','CPI data drop','Market open bell']}
+};
+
+/* ─── Accent ─────────────────────────────────────────── */
+function applyAccent(mode){
+  const c=document.getElementById('card');
+  c.style.setProperty('--accent',      MODES[mode].accent);
+  c.style.setProperty('--accent-soft', MODES[mode].soft);
+}
+
+/* ─── Theme toggle ───────────────────────────────────── */
+const SUN_SVG = `<svg id="theme-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+const MOON_SVG= `<svg id="theme-icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+
+function toggleTheme(){
+  isLight = !isLight;
+  const card = document.getElementById('card');
+  const knob = document.getElementById('theme-knob');
+  card.classList.toggle('light', isLight);
+  knob.innerHTML = isLight ? MOON_SVG : SUN_SVG;
+  const r = window._cardRatio || 1;
+  knob.style.transform = isLight ? `translateX(${18*r}px)` : 'translateX(0)';
+  autoSave();
+}
+
+/* ─── Minimize ───────────────────────────────────────── */
+function toggleMinimize(){
+  const card=document.getElementById('card');
+  card.classList.toggle('minimized');
+  if(card.classList.contains('minimized') && editMode) toggleEdit();
+}
+
+/* ─── Edit ───────────────────────────────────────────── */
+function toggleEdit(){
+  const card = document.getElementById('card');
+  // Auto-expand if minimized before entering edit mode
+  if(!editMode && card.classList.contains('minimized')){
+    card.classList.remove('minimized');
+  }
+  editMode=!editMode;
+  document.body.classList.toggle('editing',editMode);
+  const btn=document.getElementById('edit-toggle');
+  btn.classList.toggle('on',editMode);
+  btn.innerHTML=editMode
+    ?`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`
+    :`<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+  document.getElementById('mode-title').classList.toggle('editable',editMode);
+  renderOptions(currentMode); commitTitle();
+}
+
+/* ─── Title editing ──────────────────────────────────── */
+document.getElementById('mode-title').addEventListener('click',()=>{
+  if(!editMode)return;
+  const h1=document.getElementById('mode-title'),inp=document.getElementById('title-input');
+  inp.value=MODES[currentMode].title; h1.style.display='none'; inp.style.display='block'; inp.focus(); inp.select();
+});
+function commitTitle(){
+  const h1=document.getElementById('mode-title'),inp=document.getElementById('title-input');
+  if(!inp.style.display||inp.style.display==='none')return;
+  const val=inp.value.trim()||MODES[currentMode].title;
+  MODES[currentMode].title=val; h1.textContent=val; h1.style.display=''; inp.style.display='none';
+}
+
+/* ─── Options ────────────────────────────────────────── */
+function checkHTML(){return`<span class="check"><svg viewBox="0 0 16 16"><polyline points="2,8 6,12 14,4"/></svg></span>`;}
+
+function renderOptions(mode, forceIdx){
+  const list=document.getElementById('options-list');
+  const prev=list.querySelector('.option.selected');
+  const prevIdx = forceIdx !== undefined ? forceIdx
+    : prev ? [...list.children].indexOf(prev)
+    : Math.min(3,MODES[mode].options.length-1);
+  list.innerHTML='';
+  MODES[mode].options.forEach((text,i)=>{
+    const li=document.createElement('li');
+    li.className='option'+(i===prevIdx?' selected':'');
+    const del=document.createElement('button');
+    del.className='del-btn'; del.textContent='×';
+    del.addEventListener('click',e=>{e.stopPropagation();if(MODES[currentMode].options.length>1){MODES[currentMode].options.splice(i,1);renderOptions(currentMode);}});
+    const span=document.createElement('span'); span.className='opt-text'; span.textContent=text;
+    const inp=document.createElement('input'); inp.className='opt-input'; inp.type='text'; inp.value=text;
+    inp.addEventListener('blur',()=>{const v=inp.value.trim()||MODES[currentMode].options[i];MODES[currentMode].options[i]=v;span.textContent=v;span.style.display='';inp.style.display='none';});
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter')inp.blur();});
+    li.appendChild(document.createRange().createContextualFragment(checkHTML()));
+    li.appendChild(span); li.appendChild(inp); li.appendChild(del);
+    li.addEventListener('click',e=>{
+      if(e.target===del)return;
+      if(editMode){span.style.display='none';inp.style.display='block';inp.focus();inp.select();}
+      else{document.querySelectorAll('.option').forEach(o=>o.classList.remove('selected'));li.classList.add('selected');}
+    });
+    list.appendChild(li);
+  });
+  // re-apply current scale to newly created elements
+  if(window._afterRender) window._afterRender();
+}
+
+function addOption(){
+  MODES[currentMode].options.push('New option'); renderOptions(currentMode);
+  const items=document.querySelectorAll('#options-list .option');
+  const last=items[items.length-1];
+  if(last){const s=last.querySelector('.opt-text'),i=last.querySelector('.opt-input');s.style.display='none';i.style.display='block';i.focus();i.select();last.scrollIntoView({behavior:'smooth',block:'nearest'});}
+}
+
+/* ─── Mode switch ────────────────────────────────────── */
+function switchMode(mode,btn){
+  // save selected index for current mode before switching
+  const sel=document.querySelector('#options-list .option.selected');
+  if(sel){const idx=[...document.querySelectorAll('#options-list .option')].indexOf(sel);localStorage.setItem('fm_sel_'+currentMode,idx);}
+  if(editMode)toggleEdit(); commitTitle(); currentMode=mode;
+  document.querySelectorAll('.icon-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+  applyAccent(mode);
+  const t=document.getElementById('mode-title'),l=document.getElementById('options-list');
+  t.classList.add('switching'); l.classList.add('switching');
+  setTimeout(()=>{t.textContent=MODES[mode].title;renderOptions(mode);t.classList.remove('switching');l.classList.remove('switching');},180);
+}
+
+/* ─── Proportional scale from center ─────────────────── */
+(function(){
+  const handle = document.getElementById('resize-handle');
+  const card   = document.getElementById('card');
+  const MIN_S  = 0.55, MAX_S = 1.8;
+  let dragging = false, startX = 0, startS = 1, animCleared = false;
+
+  window._cardScale   = 1;
+  window._afterRender = function(){};
+
+  function clearAnim(){
+    if(animCleared) return;
+    animCleared = true;
+    card.style.animation = 'none';   // free transform from cardIn fill
+  }
+
+  function applyScale(s){
+    s = Math.min(MAX_S, Math.max(MIN_S, +s.toFixed(4)));
+    window._cardScale        = s;
+    card.style.transform      = `scale(${s})`;
+    card.style.transformOrigin = '50% 50%';
+    localStorage.setItem('fm_scale', s);
+  }
+
+  window._applyScale = applyScale;
+
+  // restore after animation finishes
+  card.addEventListener('animationend', () => {
+    clearAnim();
+    try{
+      const saved = parseFloat(localStorage.getItem('fm_scale'));
+      if(saved >= MIN_S && saved <= MAX_S) applyScale(saved);
+    }catch(e){}
+  }, {once:true});
+
+  function currentScale(){
+    const t = card.style.transform;
+    if(!t) return 1;
+    const m = t.match(/scale\(([^)]+)\)/);
+    return m ? parseFloat(m[1]) : 1;
+  }
+
+  function beginDrag(x){
+    clearAnim();                           // ensure animation won't fight us
+    dragging = true;
+    startX   = x;
+    startS   = currentScale();
+    document.body.style.userSelect = 'none';
+  }
+  function moveDrag(x){
+    if(!dragging) return;
+    // 300px drag = 1.0 scale unit; left = bigger, right = smaller
+    applyScale(startS + (startX - x) / 300);
+  }
+  function endDrag(){
+    if(!dragging) return;
+    dragging = false;
+    document.body.style.userSelect = '';
+  }
+
+  handle.addEventListener('mousedown',  e => { beginDrag(e.clientX); e.preventDefault(); });
+  document.addEventListener('mousemove', e => moveDrag(e.clientX));
+  document.addEventListener('mouseup',   endDrag);
+
+  handle.addEventListener('touchstart', e => {
+    beginDrag(e.touches[0].clientX); e.preventDefault();
+  }, {passive:false});
+  document.addEventListener('touchmove', e => {
+    if(!dragging) return;
+    moveDrag(e.touches[0].clientX); e.preventDefault();
+  }, {passive:false});
+  document.addEventListener('touchend', endDrag);
+})();
+
+/* ─── Drag to move (bottom-left corner) ─────────────── */
+(function(){
+  const card  = document.getElementById('card');
+  const grip  = document.getElementById('drag-corner');
+  let dragging=false, startX=0, startY=0, startL=0, startT=0;
+
+  function enableFixed(){
+    if(card.style.position === 'fixed') return;
+    const rect = card.getBoundingClientRect();
+    card.style.position = 'fixed';
+    card.style.left     = rect.left + 'px';
+    card.style.top      = rect.top  + 'px';
+    card.style.margin   = '0';
+    // un-center the body so fixed card doesn't fight flex
+    document.body.style.alignItems     = 'flex-start';
+    document.body.style.justifyContent = 'flex-start';
+  }
+
+  function clamp(val, min, max){ return Math.max(min, Math.min(max, val)); }
+
+  function beginDrag(x, y){
+    enableFixed();
+    dragging = true;
+    startX = x; startY = y;
+    startL = parseFloat(card.style.left) || 0;
+    startT = parseFloat(card.style.top)  || 0;
+  }
+
+  function moveDrag(x, y){
+    if(!dragging) return;
+    const newL = clamp(startL + (x - startX), 0, window.innerWidth  - card.offsetWidth);
+    const newT = clamp(startT + (y - startY), 0, window.innerHeight - card.offsetHeight);
+    card.style.left = newL + 'px';
+    card.style.top  = newT + 'px';
+    localStorage.setItem('fm_cardpos', JSON.stringify({l: newL, t: newT}));
+  }
+
+  function endDrag(){ dragging = false; document.body.style.cursor = ''; }
+
+  grip.addEventListener('mousedown', e=>{
+    beginDrag(e.clientX, e.clientY);
+    document.body.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e=>{ moveDrag(e.clientX, e.clientY); });
+  document.addEventListener('mouseup',   endDrag);
+
+  grip.addEventListener('touchstart', e=>{
+    beginDrag(e.touches[0].clientX, e.touches[0].clientY);
+    e.preventDefault();
+  },{passive:false});
+  document.addEventListener('touchmove', e=>{
+    if(!dragging) return;
+    moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+    e.preventDefault();
+  },{passive:false});
+  document.addEventListener('touchend', endDrag);
+
+  // Restore saved position on load
+  try{
+    const saved = localStorage.getItem('fm_cardpos');
+    if(saved){
+      const p = JSON.parse(saved);
+      // defer until after cardIn animation
+      setTimeout(()=>{
+        enableFixed();
+        card.style.left = clamp(p.l, 0, window.innerWidth  - card.offsetWidth)  + 'px';
+        card.style.top  = clamp(p.t, 0, window.innerHeight - card.offsetHeight) + 'px';
+      }, 450);
+    }
+  }catch(e){}
+})();
+
+/* ─── Persistence ────────────────────────────────────── */
+function saveState(){
+  localStorage.setItem('fm_modes',       JSON.stringify(MODES));
+  localStorage.setItem('fm_mode',        currentMode);
+  localStorage.setItem('fm_theme',       isLight ? '1' : '0');
+  localStorage.setItem('fm_width',       document.getElementById('card').offsetWidth);
+  localStorage.setItem('fm_icons',       JSON.stringify(iconAssignments));
+  // save selected index per mode
+  const sel = document.querySelector('#options-list .option.selected');
+  const idx = sel ? [...document.querySelectorAll('#options-list .option')].indexOf(sel) : 0;
+  localStorage.setItem('fm_sel_'+currentMode, idx);
+}
+
+function loadState(){
+  try{
+    const saved = localStorage.getItem('fm_modes');
+    if(saved){
+      const parsed = JSON.parse(saved);
+      // only restore titles + options, never accent/soft (keep hardcoded colors)
+      Object.keys(parsed).forEach(k=>{
+        if(MODES[k]){
+          if(parsed[k].title)   MODES[k].title   = parsed[k].title;
+          if(parsed[k].options) MODES[k].options = parsed[k].options;
+        }
+      });
+    }
+  } catch(e){}
+  const mode = localStorage.getItem('fm_mode');
+  if(mode && MODES[mode]) currentMode = mode;
+  isLight = localStorage.getItem('fm_theme') === '1';
+  try{
+    const savedIcons = localStorage.getItem('fm_icons');
+    if(savedIcons) iconAssignments = {...iconAssignments, ...JSON.parse(savedIcons)};
+  }catch(e){}
+}
+
+// Auto-save on any meaningful action
+function autoSave(){ requestAnimationFrame(saveState); }
+
+/* ─── Init ───────────────────────────────────────────── */
+// Clear stale accent data from older saves
+try{ const s=localStorage.getItem('fm_modes'); if(s&&JSON.parse(s)?.alerts?.accent?.includes('220,90')) localStorage.removeItem('fm_modes'); }catch(e){}
+loadState();
+
+// Restore theme
+if(isLight){
+  document.getElementById('card').classList.add('light');
+  document.getElementById('theme-knob').innerHTML = `<svg id="theme-icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+}
+
+// Restore icons from saved assignments
+initIcons();
+
+// Restore active icon button
+document.querySelectorAll('.icon-btn').forEach(b=>{
+  b.classList.toggle('active', b.dataset.mode === currentMode);
+});
+
+// Restore title
+document.getElementById('mode-title').textContent = MODES[currentMode].title;
+
+// Restore selected option index
+const savedIdx = parseInt(localStorage.getItem('fm_sel_'+currentMode)) || Math.min(3, MODES[currentMode].options.length-1);
+renderOptions(currentMode, savedIdx);
+applyAccent(currentMode);
+
+// Restore card width
+const savedW = parseInt(localStorage.getItem('fm_width'));
+if(savedW && savedW >= 220 && savedW <= 520){
+  // defer so DOM is ready
+  setTimeout(()=>{ if(window._afterRender) window._afterRender(); }, 50);
+}
+
+// Hook auto-save into user actions
+document.addEventListener('click',    autoSave);
+document.addEventListener('touchend', autoSave);
+
+if('serviceWorker' in navigator){
+  const sw=`self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>caches.match(e.request))));`;
+  const blob=new Blob([sw],{type:'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+}
+</script>
+</body>
+</html>

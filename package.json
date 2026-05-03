@@ -1,0 +1,65 @@
+{
+  "name": "focus-mode-extended",
+  "version": "1.0.0",
+  "description": "Focus Mode Extended — a trader's checklist widget",
+  "main": "main.js",
+  "author": {
+    "name": "Nova Vault",
+    "email": "hello@novavault.co"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win nsis",
+    "build:portable": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.novavault.focusmodeextended",
+    "productName": "Focus Mode Extended",
+    "copyright": "Copyright © 2025 Nova Vault",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "build/icon.ico",
+      "!node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Focus Mode Extended",
+      "menuCategory": "Focus Mode",
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "artifactName": "FocusMode-Extended-Setup-${version}.exe",
+      "include": "build/installer.nsh"
+    }
+  }
+}
