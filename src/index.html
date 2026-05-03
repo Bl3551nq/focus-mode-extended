@@ -384,6 +384,10 @@ body.editing .icon-btn::after{
 /* ── Native OS drag regions ── */
 .top-bar {
   -webkit-app-region: drag;
+  cursor: grab;
+}
+.top-bar:active {
+  cursor: grabbing;
 }
 .drag-corner{
   position:absolute; bottom:0; left:0;
@@ -391,7 +395,10 @@ body.editing .icon-btn::after{
   border-radius:0 0 0 28px;
   z-index:20;
   -webkit-app-region: drag;
-  cursor:grab;
+  cursor: grab;
+}
+.drag-corner:active {
+  cursor: grabbing;
 }
 /* All interactive elements must opt out of drag */
 button, input, .option, .icon-btn, .edit-toggle, .close-btn,
@@ -399,6 +406,7 @@ button, input, .option, .icon-btn, .edit-toggle, .close-btn,
 .resize-handle, .icon-picker, .top-bar-right, .minimize-bar,
 a, select {
   -webkit-app-region: no-drag;
+  cursor: pointer;
 }
 </style>
 </head>
@@ -780,22 +788,25 @@ function switchMode(mode,btn){
     card.style.animation = 'none';
   }
 
-  function applyZoom(s, sendIPC){
+  function applyZoom(s, mode){
+    // mode: 'drag' = size only (no position jump), 'release' = full center
     s = Math.min(MAX_S, Math.max(MIN_S, +s.toFixed(4)));
     window._cardScale = s;
     card.style.zoom = s;
-    // Only resize the OS window on release — prevents wobble during drag
-    if (sendIPC && window.electronAPI) window.electronAPI.setZoom(s);
+    if (window.electronAPI){
+      if(mode === 'drag')    window.electronAPI.setZoomSize(s);
+      if(mode === 'release') window.electronAPI.setZoom(s);
+    }
     localStorage.setItem('fm_scale', s);
   }
 
-  window._applyScale = (s) => applyZoom(s, true);
+  window._applyScale = (s) => applyZoom(s, 'release');
 
   card.addEventListener('animationend', () => {
     clearAnim();
     try {
       const saved = parseFloat(localStorage.getItem('fm_scale'));
-      if (saved >= MIN_S && saved <= MAX_S) applyZoom(saved, true);
+      if (saved >= MIN_S && saved <= MAX_S) applyZoom(saved, 'release');
     } catch(e){}
   }, {once: true});
 
@@ -812,13 +823,13 @@ function switchMode(mode,btn){
   }
   function moveDrag(x){
     if(!dragging) return;
-    applyZoom(startS + (startX - x) / 300, false); // no IPC during drag
+    applyZoom(startS + (startX - x) / 300, 'drag');
   }
   function endDrag(){
     if(!dragging) return;
     dragging = false;
     document.body.style.userSelect = '';
-    applyZoom(window._cardScale, true); // send IPC once on release
+    applyZoom(window._cardScale, 'release'); // center window once on release
   }
 
   handle.addEventListener('mousedown',  e => { beginDrag(e.clientX); e.preventDefault(); });

@@ -67,6 +67,14 @@ function createWindow() {
   mainWin.on('closed', () => { mainWin = null; });
 }
 
+/* ── IPC: size only during drag (no position = no wobble) ── */
+ipcMain.on('set-zoom-size', (e, scale) => {
+  if (!mainWin) return;
+  const newW = Math.round(BASE_W * scale);
+  const newH = Math.round(BASE_H * scale);
+  mainWin.setSize(newW, newH, false);
+});
+
 /* ── IPC: resize window atomically when zoom changes ── */
 ipcMain.on('set-zoom', (e, scale) => {
   if (!mainWin) return;
