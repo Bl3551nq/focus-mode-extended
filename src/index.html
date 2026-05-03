@@ -31,10 +31,6 @@ html, body {
   padding:14px 20px 14px;
   background:rgba(18,14,30,0.96);
   border:1px solid rgba(255,255,255,0.08);
-  box-shadow:
-    0 4px 24px rgba(0,0,0,0.6),
-    0 16px 48px rgba(0,0,0,0.5),
-    0 0 0 1px rgba(255,255,255,0.04);
   display:flex; flex-direction:column;
   animation:cardIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
   transform-origin: 50% 50%;
@@ -67,9 +63,6 @@ html, body {
 .card.light {
   background:rgba(245,245,250,0.98);
   border:1px solid rgba(0,0,0,0.08);
-  box-shadow:
-    0 4px 24px rgba(0,0,0,0.15),
-    0 16px 48px rgba(0,0,0,0.12);
   --text:        #111111;
   --text-dim:    rgba(0,0,0,0.35);
   --text-mid:    rgba(0,0,0,0.7);
@@ -388,19 +381,23 @@ body.editing .icon-btn::after{
 .update-install-btn:hover{ background:rgba(255,255,255,0.35); }
 .update-install-btn.downloading{ opacity:0.6; pointer-events:none; }
 .card.light .update-banner{ background:linear-gradient(135deg,rgba(80,20,200,0.95),rgba(160,10,60,0.95)); }
-.drag-corner{
-  position:absolute; bottom:0; left:0;
-  width:44px; height:44px;
-  border-radius:0 0 0 28px;
-  z-index:20;
-  cursor:grab;
+/* ── Native OS drag regions ── */
+.top-bar {
   -webkit-app-region: drag;
 }
-.drag-corner:active{ cursor:grabbing; }
-/* Prevent accidental drag on interactive elements */
+.drag-corner{
+  position:absolute; bottom:0; left:0;
+  width:60px; height:60px;
+  border-radius:0 0 0 28px;
+  z-index:20;
+  -webkit-app-region: drag;
+  cursor:grab;
+}
+/* All interactive elements must opt out of drag */
 button, input, .option, .icon-btn, .edit-toggle, .close-btn,
 .add-btn, .scroll-area, .theme-switch, .minimize-pill,
-.resize-handle, .icon-picker {
+.resize-handle, .icon-picker, .top-bar-right, .minimize-bar,
+a, select {
   -webkit-app-region: no-drag;
 }
 </style>
@@ -783,23 +780,22 @@ function switchMode(mode,btn){
     card.style.animation = 'none';
   }
 
-  function applyZoom(s){
+  function applyZoom(s, sendIPC){
     s = Math.min(MAX_S, Math.max(MIN_S, +s.toFixed(4)));
     window._cardScale = s;
-    // CSS zoom re-renders at native resolution — always sharp
     card.style.zoom = s;
-    // Tell main process to resize the window to match
-    if (window.electronAPI) window.electronAPI.setZoom(s);
+    // Only resize the OS window on release — prevents wobble during drag
+    if (sendIPC && window.electronAPI) window.electronAPI.setZoom(s);
     localStorage.setItem('fm_scale', s);
   }
 
-  window._applyScale = applyZoom;
+  window._applyScale = (s) => applyZoom(s, true);
 
   card.addEventListener('animationend', () => {
     clearAnim();
     try {
       const saved = parseFloat(localStorage.getItem('fm_scale'));
-      if (saved >= MIN_S && saved <= MAX_S) applyZoom(saved);
+      if (saved >= MIN_S && saved <= MAX_S) applyZoom(saved, true);
     } catch(e){}
   }, {once: true});
 
@@ -816,12 +812,13 @@ function switchMode(mode,btn){
   }
   function moveDrag(x){
     if(!dragging) return;
-    applyZoom(startS + (startX - x) / 300);
+    applyZoom(startS + (startX - x) / 300, false); // no IPC during drag
   }
   function endDrag(){
     if(!dragging) return;
     dragging = false;
     document.body.style.userSelect = '';
+    applyZoom(window._cardScale, true); // send IPC once on release
   }
 
   handle.addEventListener('mousedown',  e => { beginDrag(e.clientX); e.preventDefault(); });
