@@ -390,12 +390,19 @@ body.editing .icon-btn::after{
 .card.light .update-banner{ background:linear-gradient(135deg,rgba(80,20,200,0.95),rgba(160,10,60,0.95)); }
 .drag-corner{
   position:absolute; bottom:0; left:0;
-  width:34px; height:34px;
+  width:44px; height:44px;
   border-radius:0 0 0 28px;
-  cursor:grab; z-index:20;
+  z-index:20;
+  cursor:grab;
+  -webkit-app-region: drag;
 }
 .drag-corner:active{ cursor:grabbing; }
-.card.minimized .drag-corner{ border-radius:0 0 0 28px; }
+/* Prevent accidental drag on interactive elements */
+button, input, .option, .icon-btn, .edit-toggle, .close-btn,
+.add-btn, .scroll-area, .theme-switch, .minimize-pill,
+.resize-handle, .icon-picker {
+  -webkit-app-region: no-drag;
+}
 </style>
 </head>
 <body>
@@ -853,36 +860,6 @@ if (window.electronAPI) {
     if (vEl) vEl.textContent = 'Ready to install';
   });
 }
-(function(){
-  const grip = document.getElementById('drag-corner');
-  if (!grip) return;
-  let dragging = false;
-
-  function beginDrag() {
-    dragging = true;
-    if (window.electronAPI) window.electronAPI.dragStart();
-    document.body.style.userSelect = 'none';
-  }
-  function moveDrag() {
-    if (!dragging) return;
-    if (window.electronAPI) window.electronAPI.dragMove();
-  }
-  function endDrag() {
-    if (!dragging) return;
-    dragging = false;
-    if (window.electronAPI) window.electronAPI.dragEnd();
-    document.body.style.userSelect = '';
-  }
-
-  grip.addEventListener('mousedown',  e => { beginDrag(); e.preventDefault(); });
-  document.addEventListener('mousemove', () => moveDrag());
-  document.addEventListener('mouseup',   endDrag);
-
-  grip.addEventListener('touchstart', e => { beginDrag(); e.preventDefault(); }, {passive:false});
-  document.addEventListener('touchmove', e => { if(dragging){ moveDrag(); e.preventDefault(); } }, {passive:false});
-  document.addEventListener('touchend', endDrag);
-})();
-
 /* ─── Persistence ────────────────────────────────────── */
 function saveState(){
   localStorage.setItem('fm_modes',       JSON.stringify(MODES));
