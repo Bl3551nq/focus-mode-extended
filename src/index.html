@@ -769,7 +769,7 @@ function switchMode(mode,btn){
   setTimeout(()=>{t.textContent=MODES[mode].title;renderOptions(mode);t.classList.remove('switching');l.classList.remove('switching');},180);
 }
 
-/* ─── Scale handle ───────────────────────────────────── */
+/* ─── Scale handle — pure CSS zoom, window never resizes ─ */
 (function(){
   const handle = document.getElementById('resize-handle');
   const card   = document.getElementById('card');
@@ -785,50 +785,40 @@ function switchMode(mode,btn){
     card.style.animation = 'none';
   }
 
-  function applyZoomCSS(s){
+  function applyZoom(s){
     s = Math.min(MAX_S, Math.max(MIN_S, +s.toFixed(4)));
     window._cardScale = s;
     card.style.zoom = s;
     localStorage.setItem('fm_scale', s);
-    return s;
   }
 
-  window._applyScale = (s) => {
-    const clamped = applyZoomCSS(s);
-    if (window.electronAPI) window.electronAPI.scaleEnd(clamped);
-  };
+  window._applyScale = applyZoom;
 
   card.addEventListener('animationend', () => {
     clearAnim();
     try {
       const saved = parseFloat(localStorage.getItem('fm_scale'));
-      if (saved >= MIN_S && saved <= MAX_S){
-        applyZoomCSS(saved);
-        if (window.electronAPI) window.electronAPI.scaleEnd(saved);
-      }
+      if (saved >= MIN_S && saved <= MAX_S) applyZoom(saved);
     } catch(e){}
   }, {once: true});
 
   function beginDrag(screenX){
     clearAnim();
     dragging = true;
-    startX   = screenX;                         // ← screenX: absolute, never shifts
+    startX   = screenX;
     startS   = parseFloat(card.style.zoom) || 1;
     document.body.style.userSelect = 'none';
-    if (window.electronAPI) window.electronAPI.scaleStart();
   }
   function moveDrag(screenX){
     if(!dragging) return;
-    applyZoomCSS(startS + (startX - screenX) / 300);
+    applyZoom(startS + (startX - screenX) / 300);
   }
   function endDrag(){
     if(!dragging) return;
     dragging = false;
     document.body.style.userSelect = '';
-    if (window.electronAPI) window.electronAPI.scaleEnd(window._cardScale);
   }
 
-  // Use screenX everywhere — immune to window repositioning
   handle.addEventListener('mousedown',  e => { beginDrag(e.screenX); e.preventDefault(); });
   document.addEventListener('mousemove', e => moveDrag(e.screenX));
   document.addEventListener('mouseup',   endDrag);

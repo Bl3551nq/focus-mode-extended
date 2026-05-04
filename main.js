@@ -17,9 +17,17 @@ function saveWindowState(data) {
 let mainWin = null;
 const BASE_W = 360, BASE_H = 580;
 const MAX_SCALE = 1.8;
-// Oversized transparent window used during scale drag so content never crops
-const DRAG_W = Math.ceil(BASE_W * MAX_SCALE) + 20;
-const DRAG_H = Math.ceil(BASE_H * MAX_SCALE) + 20;
+const DRAG_W = Math.ceil(BASE_W * MAX_SCALE) + 40;
+const DRAG_H = Math.ceil(BASE_H * MAX_SCALE) + 40;
+
+// Center point anchored before scale expansion — ensures no drift on shrink
+let scaleCenterX = 0, scaleCenterY = 0;
+let currentScale = 1;
+
+// Drag state
+let isDragging = false;
+let dragOffX = 0, dragOffY = 0;
+let dragInterval = null;
 
 function createWindow() {
   const saved = loadWindowState();
@@ -29,23 +37,22 @@ function createWindow() {
   let winW = BASE_W, winH = BASE_H;
 
   if (saved && saved.x != null) {
-    const displays = screen.getAllDisplays();
-    const onScreen = displays.some(d => {
+    const onScreen = screen.getAllDisplays().some(d => {
       const b = d.workArea;
-      return saved.x >= b.x && saved.y >= b.y &&
-             saved.x + (saved.width||BASE_W) <= b.x + b.width &&
-             saved.y + (saved.height||BASE_H) <= b.y + b.height;
+      return saved.x >= b.x - 50 && saved.y >= b.y - 50 &&
+             saved.x < b.x + b.width && saved.y < b.y + b.height;
     });
     if (onScreen) {
       winX = saved.x; winY = saved.y;
-      winW = saved.width || BASE_W;
+      winW = saved.width  || BASE_W;
       winH = saved.height || BASE_H;
+      currentScale = saved.scale || 1;
     }
   }
 
   mainWin = new BrowserWindow({
     width: winW, height: winH, x: winX, y: winY,
-    minWidth: 200, minHeight: 300,
+    minWidth: 100, minHeight: 100,
     frame: false, transparent: true,
     backgroundColor: '#00000000',
     hasShadow: false,
@@ -65,12 +72,10 @@ function createWindow() {
   mainWin.on('closed', () => { mainWin = null; });
 }
 
-/* ══════════════════════════════════════════════════════
-   DRAG — uses getCursorScreenPoint() so it works across
-   the entire screen with no DPI/coordinate issues
-══════════════════════════════════════════════════════ */
-let isDragging = false, dragOffX = 0, dragOffY = 0, dragInterval = null;
-
+/* ═══════════════════════════════════════════════════
+   DRAG — 60fps polling from OS cursor, no bounds clamp
+   so window moves freely to every screen corner
+═══════════════════════════════════════════════════ */
 ipcMain.on('drag-start', () => {
   if (!mainWin) return;
   const cursor = screen.getCursorScreenPoint();
@@ -79,71 +84,72 @@ ipcMain.on('drag-start', () => {
   dragOffY = cursor.y - wy;
   isDragging = true;
 
-  // Poll cursor position at 60fps instead of relying on renderer events
-  const BASE_W_SCALED = Math.round(BASE_W * (global._currentScale || 1));
-  const BASE_H_SCALED = Math.round(BASE_H * (global._currentScale || 1));
+  if (dragInterval) clearInterval(dragInterval);
   dragInterval = setInterval(() => {
     if (!isDragging || !mainWin) return;
     const c = screen.getCursorScreenPoint();
-    const display = screen.getDisplayNearestPoint(c);
-    const wa = display.workArea;
-    // Use actual content size (not DRAG_W) for bounds — allows reaching all edges
-    const [ww, wh] = mainWin.getSize();
-    const contentW = global._currentScale ? Math.round(BASE_W * global._currentScale) : ww;
-    const contentH = global._currentScale ? Math.round(BASE_H * global._currentScale) : wh;
-    const nx = Math.max(wa.x, Math.min(wa.x + wa.width  - contentW, c.x - dragOffX));
-    const ny = Math.max(wa.y, Math.min(wa.y + wa.height - contentH, c.y - dragOffY));
-    mainWin.setPosition(Math.round(nx), Math.round(ny));
-  }, 16); // ~60fps
+    // No clamping — let window move anywhere on screen
+    mainWin.setPosition(
+      Math.round(c.x - dragOffX),
+      Math.round(c.y - dragOffY)
+    );
+  }, 16);
 });
 
 ipcMain.on('drag-end', () => {
   isDragging = false;
   if (dragInterval) { clearInterval(dragInterval); dragInterval = null; }
-  if (mainWin) {
-    const [x, y] = mainWin.getPosition();
-    const [w, h] = mainWin.getSize();
-    saveWindowState({ x, y, width: w, height: h });
-  }
+  if (!mainWin) return;
+  const [x, y] = mainWin.getPosition();
+  const [w, h] = mainWin.getSize();
+  saveWindowState({ x, y, width: w, height: h, scale: currentScale });
 });
 
-/* ══════════════════════════════════════════════════════
-   SCALE — expand window silently on start, shrink on end
-   Zero resize calls during drag = zero wobble
-══════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════
+   SCALE — anchor to center point so shrink lands
+   exactly where expand started — zero twitch
+═══════════════════════════════════════════════════ */
 ipcMain.on('scale-start', () => {
   if (!mainWin) return;
-  const [cx, cy] = mainWin.getPosition();
-  const [cw, ch] = mainWin.getSize();
-  // Expand to max possible size, centered on current window center
-  const nx = Math.round(cx + (cw - DRAG_W) / 2);
-  const ny = Math.round(cy + (ch - DRAG_H) / 2);
-  mainWin.setBounds({ x: nx, y: ny, width: DRAG_W, height: DRAG_H }, false);
+  const [wx, wy] = mainWin.getPosition();
+  const [ww, wh] = mainWin.getSize();
+  // Record the center of the CURRENT window (before expansion)
+  scaleCenterX = wx + ww / 2;
+  scaleCenterY = wy + wh / 2;
+  // Expand symmetrically around that center
+  mainWin.setBounds({
+    x: Math.round(scaleCenterX - DRAG_W / 2),
+    y: Math.round(scaleCenterY - DRAG_H / 2),
+    width: DRAG_W,
+    height: DRAG_H,
+  }, false);
 });
 
 ipcMain.on('scale-end', (e, scale) => {
   if (!mainWin) return;
-  global._currentScale = scale;           // track for drag bounds
+  currentScale = scale;
   const newW = Math.round(BASE_W * scale);
   const newH = Math.round(BASE_H * scale);
-  const [cx, cy] = mainWin.getPosition();
-  const [cw, ch] = mainWin.getSize();
+  // Shrink back anchored to the SAME center point — no drift, no twitch
   mainWin.setBounds({
-    x: Math.round(cx + (cw - newW) / 2),
-    y: Math.round(cy + (ch - newH) / 2),
-    width: newW, height: newH,
+    x: Math.round(scaleCenterX - newW / 2),
+    y: Math.round(scaleCenterY - newH / 2),
+    width: newW,
+    height: newH,
   }, false);
-  const [x, y] = mainWin.getPosition();
-  saveWindowState({ x, y, width: newW, height: newH });
+  saveWindowState({
+    x: Math.round(scaleCenterX - newW / 2),
+    y: Math.round(scaleCenterY - newH / 2),
+    width: newW, height: newH, scale,
+  });
 });
 
-/* ══════════════════════════════════════════════════════
-   MISC IPC
-══════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════
+   MISC
+═══════════════════════════════════════════════════ */
 ipcMain.on('close-window',   () => { if (mainWin) mainWin.close(); });
 ipcMain.on('install-update', () => { autoUpdater.quitAndInstall(); });
 
-/* ── Auto-updater ── */
 function setupUpdater() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
