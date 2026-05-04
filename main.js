@@ -80,14 +80,19 @@ ipcMain.on('drag-start', () => {
   isDragging = true;
 
   // Poll cursor position at 60fps instead of relying on renderer events
+  const BASE_W_SCALED = Math.round(BASE_W * (global._currentScale || 1));
+  const BASE_H_SCALED = Math.round(BASE_H * (global._currentScale || 1));
   dragInterval = setInterval(() => {
     if (!isDragging || !mainWin) return;
     const c = screen.getCursorScreenPoint();
     const display = screen.getDisplayNearestPoint(c);
     const wa = display.workArea;
+    // Use actual content size (not DRAG_W) for bounds — allows reaching all edges
     const [ww, wh] = mainWin.getSize();
-    const nx = Math.max(wa.x, Math.min(wa.x + wa.width  - ww, c.x - dragOffX));
-    const ny = Math.max(wa.y, Math.min(wa.y + wa.height - wh, c.y - dragOffY));
+    const contentW = global._currentScale ? Math.round(BASE_W * global._currentScale) : ww;
+    const contentH = global._currentScale ? Math.round(BASE_H * global._currentScale) : wh;
+    const nx = Math.max(wa.x, Math.min(wa.x + wa.width  - contentW, c.x - dragOffX));
+    const ny = Math.max(wa.y, Math.min(wa.y + wa.height - contentH, c.y - dragOffY));
     mainWin.setPosition(Math.round(nx), Math.round(ny));
   }, 16); // ~60fps
 });
@@ -118,11 +123,11 @@ ipcMain.on('scale-start', () => {
 
 ipcMain.on('scale-end', (e, scale) => {
   if (!mainWin) return;
+  global._currentScale = scale;           // track for drag bounds
   const newW = Math.round(BASE_W * scale);
   const newH = Math.round(BASE_H * scale);
   const [cx, cy] = mainWin.getPosition();
   const [cw, ch] = mainWin.getSize();
-  // Shrink back to exact content size, centered
   mainWin.setBounds({
     x: Math.round(cx + (cw - newW) / 2),
     y: Math.round(cy + (ch - newH) / 2),

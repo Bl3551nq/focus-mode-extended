@@ -809,32 +809,31 @@ function switchMode(mode,btn){
     } catch(e){}
   }, {once: true});
 
-  function beginDrag(x){
+  function beginDrag(screenX){
     clearAnim();
     dragging = true;
-    startX   = x;
+    startX   = screenX;                         // ← screenX: absolute, never shifts
     startS   = parseFloat(card.style.zoom) || 1;
     document.body.style.userSelect = 'none';
-    // Silently expand window to max size — content never crops during drag
     if (window.electronAPI) window.electronAPI.scaleStart();
   }
-  function moveDrag(x){
+  function moveDrag(screenX){
     if(!dragging) return;
-    applyZoomCSS(startS + (startX - x) / 300);
+    applyZoomCSS(startS + (startX - screenX) / 300);
   }
   function endDrag(){
     if(!dragging) return;
     dragging = false;
     document.body.style.userSelect = '';
-    // Shrink window to exact content size — one call, no wobble
     if (window.electronAPI) window.electronAPI.scaleEnd(window._cardScale);
   }
 
-  handle.addEventListener('mousedown',  e => { beginDrag(e.clientX); e.preventDefault(); });
-  document.addEventListener('mousemove', e => moveDrag(e.clientX));
+  // Use screenX everywhere — immune to window repositioning
+  handle.addEventListener('mousedown',  e => { beginDrag(e.screenX); e.preventDefault(); });
+  document.addEventListener('mousemove', e => moveDrag(e.screenX));
   document.addEventListener('mouseup',   endDrag);
-  handle.addEventListener('touchstart', e => { beginDrag(e.touches[0].clientX); e.preventDefault(); }, {passive:false});
-  document.addEventListener('touchmove', e => { if(!dragging) return; moveDrag(e.touches[0].clientX); e.preventDefault(); }, {passive:false});
+  handle.addEventListener('touchstart', e => { beginDrag(e.touches[0].screenX); e.preventDefault(); }, {passive:false});
+  document.addEventListener('touchmove', e => { if(!dragging) return; moveDrag(e.touches[0].screenX); e.preventDefault(); }, {passive:false});
   document.addEventListener('touchend', endDrag);
 })();
 
