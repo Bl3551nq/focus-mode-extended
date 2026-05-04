@@ -383,7 +383,6 @@ body.editing .icon-btn::after{
 .card.light .update-banner{ background:linear-gradient(135deg,rgba(80,20,200,0.95),rgba(160,10,60,0.95)); }
 /* ── Native OS drag regions ── */
 .top-bar {
-  -webkit-app-region: drag;
   cursor: grab;
 }
 .top-bar:active {
@@ -394,20 +393,18 @@ body.editing .icon-btn::after{
   width:60px; height:60px;
   border-radius:0 0 0 28px;
   z-index:20;
-  -webkit-app-region: drag;
   cursor: grab;
 }
 .drag-corner:active {
   cursor: grabbing;
 }
-/* All interactive elements must opt out of drag */
+/* Interactive elements keep pointer cursor */
 button, input, .option, .icon-btn, .edit-toggle, .close-btn,
-.add-btn, .scroll-area, .theme-switch, .minimize-pill,
-.resize-handle, .icon-picker, .top-bar-right, .minimize-bar,
-a, select {
-  -webkit-app-region: no-drag;
+.add-btn, .theme-switch, .minimize-pill, .minimize-bar,
+.resize-handle, a, select {
   cursor: pointer;
 }
+.scroll-area { cursor: default; }
 </style>
 </head>
 <body>
@@ -430,7 +427,7 @@ a, select {
   </div>
 
   <!-- Top bar: theme switch | minimize pill | edit button -->
-  <div class="top-bar">
+  <div class="top-bar" id="top-bar">
 
     <!-- Theme toggle (left) -->
     <div class="theme-switch" id="theme-switch" onclick="toggleTheme()">
@@ -772,7 +769,7 @@ function switchMode(mode,btn){
   setTimeout(()=>{t.textContent=MODES[mode].title;renderOptions(mode);t.classList.remove('switching');l.classList.remove('switching');},180);
 }
 
-/* ─── Pixel-perfect zoom via CSS zoom + window resize ── */
+/* ─── Scale handle ───────────────────────────────────── */
 (function(){
   const handle = document.getElementById('resize-handle');
   const card   = document.getElementById('card');
@@ -788,61 +785,98 @@ function switchMode(mode,btn){
     card.style.animation = 'none';
   }
 
-  function applyZoom(s, mode){
-    // mode: 'drag' = size only (no position jump), 'release' = full center
+  function applyZoomCSS(s){
     s = Math.min(MAX_S, Math.max(MIN_S, +s.toFixed(4)));
     window._cardScale = s;
     card.style.zoom = s;
-    if (window.electronAPI){
-      if(mode === 'drag')    window.electronAPI.setZoomSize(s);
-      if(mode === 'release') window.electronAPI.setZoom(s);
-    }
     localStorage.setItem('fm_scale', s);
+    return s;
   }
 
-  window._applyScale = (s) => applyZoom(s, 'release');
+  window._applyScale = (s) => {
+    const clamped = applyZoomCSS(s);
+    if (window.electronAPI) window.electronAPI.scaleEnd(clamped);
+  };
 
   card.addEventListener('animationend', () => {
     clearAnim();
     try {
       const saved = parseFloat(localStorage.getItem('fm_scale'));
-      if (saved >= MIN_S && saved <= MAX_S) applyZoom(saved, 'release');
+      if (saved >= MIN_S && saved <= MAX_S){
+        applyZoomCSS(saved);
+        if (window.electronAPI) window.electronAPI.scaleEnd(saved);
+      }
     } catch(e){}
   }, {once: true});
-
-  function currentZoom(){
-    return parseFloat(card.style.zoom) || 1;
-  }
 
   function beginDrag(x){
     clearAnim();
     dragging = true;
-    startX = x;
-    startS = currentZoom();
+    startX   = x;
+    startS   = parseFloat(card.style.zoom) || 1;
     document.body.style.userSelect = 'none';
+    // Silently expand window to max size — content never crops during drag
+    if (window.electronAPI) window.electronAPI.scaleStart();
   }
   function moveDrag(x){
     if(!dragging) return;
-    applyZoom(startS + (startX - x) / 300, 'drag');
+    applyZoomCSS(startS + (startX - x) / 300);
   }
   function endDrag(){
     if(!dragging) return;
     dragging = false;
     document.body.style.userSelect = '';
-    applyZoom(window._cardScale, 'release'); // center window once on release
+    // Shrink window to exact content size — one call, no wobble
+    if (window.electronAPI) window.electronAPI.scaleEnd(window._cardScale);
   }
 
   handle.addEventListener('mousedown',  e => { beginDrag(e.clientX); e.preventDefault(); });
   document.addEventListener('mousemove', e => moveDrag(e.clientX));
   document.addEventListener('mouseup',   endDrag);
+  handle.addEventListener('touchstart', e => { beginDrag(e.touches[0].clientX); e.preventDefault(); }, {passive:false});
+  document.addEventListener('touchmove', e => { if(!dragging) return; moveDrag(e.touches[0].clientX); e.preventDefault(); }, {passive:false});
+  document.addEventListener('touchend', endDrag);
+})();
 
-  handle.addEventListener('touchstart', e => {
-    beginDrag(e.touches[0].clientX); e.preventDefault();
-  }, {passive:false});
-  document.addEventListener('touchmove', e => {
+/* ─── Drag to move (top-bar + corner) ───────────────── */
+(function(){
+  const topBar = document.getElementById('top-bar');
+  const corner = document.getElementById('drag-corner');
+  let dragging = false;
+
+  function startDrag(e){
+    // Don't drag if clicking a button or interactive child
+    if (e.target.closest('button, input, .theme-switch, .minimize-bar, .top-bar-right')) return;
+    dragging = true;
+    document.body.style.userSelect = 'none';
+    if (window.electronAPI) window.electronAPI.dragStart();
+    e.preventDefault();
+  }
+  function endDrag(){
     if(!dragging) return;
-    moveDrag(e.touches[0].clientX); e.preventDefault();
-  }, {passive:false});
+    dragging = false;
+    document.body.style.userSelect = '';
+    if (window.electronAPI) window.electronAPI.dragEnd();
+  }
+
+  if (topBar){
+    topBar.addEventListener('mousedown', startDrag);
+    topBar.addEventListener('touchstart', startDrag, {passive:false});
+  }
+  if (corner){
+    corner.addEventListener('mousedown', e => {
+      dragging = true;
+      document.body.style.userSelect = 'none';
+      if (window.electronAPI) window.electronAPI.dragStart();
+      e.preventDefault();
+    });
+    corner.addEventListener('touchstart', e => {
+      dragging = true;
+      if (window.electronAPI) window.electronAPI.dragStart();
+      e.preventDefault();
+    }, {passive:false});
+  }
+  document.addEventListener('mouseup',  endDrag);
   document.addEventListener('touchend', endDrag);
 })();
 

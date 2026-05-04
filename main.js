@@ -10,43 +10,43 @@ function loadWindowState() {
   try { return JSON.parse(fs.readFileSync(windowStatePath, 'utf8')); }
   catch { return null; }
 }
-function saveWindowState(win) {
-  try {
-    if (win.isMinimized() || win.isMaximized()) return;
-    fs.writeFileSync(windowStatePath, JSON.stringify(win.getBounds()));
-  } catch {}
+function saveWindowState(data) {
+  try { fs.writeFileSync(windowStatePath, JSON.stringify(data)); } catch {}
 }
 
 let mainWin = null;
 const BASE_W = 360, BASE_H = 580;
+const MAX_SCALE = 1.8;
+// Oversized transparent window used during scale drag so content never crops
+const DRAG_W = Math.ceil(BASE_W * MAX_SCALE) + 20;
+const DRAG_H = Math.ceil(BASE_H * MAX_SCALE) + 20;
 
 function createWindow() {
   const saved = loadWindowState();
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
-
   let winX = Math.round((sw - BASE_W) / 2);
   let winY = Math.round((sh - BASE_H) / 2);
   let winW = BASE_W, winH = BASE_H;
 
-  if (saved) {
+  if (saved && saved.x != null) {
     const displays = screen.getAllDisplays();
     const onScreen = displays.some(d => {
       const b = d.workArea;
       return saved.x >= b.x && saved.y >= b.y &&
-             saved.x + saved.width  <= b.x + b.width &&
-             saved.y + saved.height <= b.y + b.height;
+             saved.x + (saved.width||BASE_W) <= b.x + b.width &&
+             saved.y + (saved.height||BASE_H) <= b.y + b.height;
     });
     if (onScreen) {
       winX = saved.x; winY = saved.y;
-      winW = saved.width; winH = saved.height;
+      winW = saved.width || BASE_W;
+      winH = saved.height || BASE_H;
     }
   }
 
   mainWin = new BrowserWindow({
     width: winW, height: winH, x: winX, y: winY,
     minWidth: 200, minHeight: 300,
-    frame: false,
-    transparent: true,
+    frame: false, transparent: true,
     backgroundColor: '#00000000',
     hasShadow: false,
     resizable: false,
@@ -54,8 +54,7 @@ function createWindow() {
     show: false,
     icon: path.join(__dirname, 'build', 'icon.ico'),
     webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
+      nodeIntegration: false, contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
     },
     roundedCorners: true,
@@ -63,36 +62,79 @@ function createWindow() {
 
   mainWin.loadFile(path.join(__dirname, 'src', 'index.html'));
   mainWin.once('ready-to-show', () => { mainWin.show(); mainWin.focus(); });
-  ['move', 'resize'].forEach(e => mainWin.on(e, () => saveWindowState(mainWin)));
   mainWin.on('closed', () => { mainWin = null; });
 }
 
-/* ── IPC: size only during drag (no position = no wobble) ── */
-ipcMain.on('set-zoom-size', (e, scale) => {
+/* ══════════════════════════════════════════════════════
+   DRAG — uses getCursorScreenPoint() so it works across
+   the entire screen with no DPI/coordinate issues
+══════════════════════════════════════════════════════ */
+let isDragging = false, dragOffX = 0, dragOffY = 0, dragInterval = null;
+
+ipcMain.on('drag-start', () => {
   if (!mainWin) return;
-  const newW = Math.round(BASE_W * scale);
-  const newH = Math.round(BASE_H * scale);
-  mainWin.setSize(newW, newH, false);
+  const cursor = screen.getCursorScreenPoint();
+  const [wx, wy] = mainWin.getPosition();
+  dragOffX = cursor.x - wx;
+  dragOffY = cursor.y - wy;
+  isDragging = true;
+
+  // Poll cursor position at 60fps instead of relying on renderer events
+  dragInterval = setInterval(() => {
+    if (!isDragging || !mainWin) return;
+    const c = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(c);
+    const wa = display.workArea;
+    const [ww, wh] = mainWin.getSize();
+    const nx = Math.max(wa.x, Math.min(wa.x + wa.width  - ww, c.x - dragOffX));
+    const ny = Math.max(wa.y, Math.min(wa.y + wa.height - wh, c.y - dragOffY));
+    mainWin.setPosition(Math.round(nx), Math.round(ny));
+  }, 16); // ~60fps
 });
 
-/* ── IPC: resize window atomically when zoom changes ── */
-ipcMain.on('set-zoom', (e, scale) => {
+ipcMain.on('drag-end', () => {
+  isDragging = false;
+  if (dragInterval) { clearInterval(dragInterval); dragInterval = null; }
+  if (mainWin) {
+    const [x, y] = mainWin.getPosition();
+    const [w, h] = mainWin.getSize();
+    saveWindowState({ x, y, width: w, height: h });
+  }
+});
+
+/* ══════════════════════════════════════════════════════
+   SCALE — expand window silently on start, shrink on end
+   Zero resize calls during drag = zero wobble
+══════════════════════════════════════════════════════ */
+ipcMain.on('scale-start', () => {
+  if (!mainWin) return;
+  const [cx, cy] = mainWin.getPosition();
+  const [cw, ch] = mainWin.getSize();
+  // Expand to max possible size, centered on current window center
+  const nx = Math.round(cx + (cw - DRAG_W) / 2);
+  const ny = Math.round(cy + (ch - DRAG_H) / 2);
+  mainWin.setBounds({ x: nx, y: ny, width: DRAG_W, height: DRAG_H }, false);
+});
+
+ipcMain.on('scale-end', (e, scale) => {
   if (!mainWin) return;
   const newW = Math.round(BASE_W * scale);
   const newH = Math.round(BASE_H * scale);
   const [cx, cy] = mainWin.getPosition();
-  const [ow, oh] = mainWin.getSize();
-  // atomic setBounds — no visual jump between position & size changes
+  const [cw, ch] = mainWin.getSize();
+  // Shrink back to exact content size, centered
   mainWin.setBounds({
-    x: Math.round(cx + (ow - newW) / 2),
-    y: Math.round(cy + (oh - newH) / 2),
-    width:  newW,
-    height: newH,
-  }, false); // false = no animation
-  saveWindowState(mainWin);
+    x: Math.round(cx + (cw - newW) / 2),
+    y: Math.round(cy + (ch - newH) / 2),
+    width: newW, height: newH,
+  }, false);
+  const [x, y] = mainWin.getPosition();
+  saveWindowState({ x, y, width: newW, height: newH });
 });
 
-/* ── IPC: close & update ── */
+/* ══════════════════════════════════════════════════════
+   MISC IPC
+══════════════════════════════════════════════════════ */
 ipcMain.on('close-window',   () => { if (mainWin) mainWin.close(); });
 ipcMain.on('install-update', () => { autoUpdater.quitAndInstall(); });
 
