@@ -683,13 +683,6 @@ function toggleMinimize(){
   const card=document.getElementById('card');
   card.classList.toggle('minimized');
   if(card.classList.contains('minimized') && editMode) toggleEdit();
-  // Tell main the new card size so hit-poll updates immediately
-  setTimeout(() => {
-    if (window.electronAPI) {
-      const r = card.getBoundingClientRect();
-      window.electronAPI.cardBounds({ x: r.left, y: r.top, w: r.width, h: r.height });
-    }
-  }, 320); // after CSS transition
 }
 
 /* ─── Edit ───────────────────────────────────────────── */
@@ -776,7 +769,7 @@ function switchMode(mode,btn){
   setTimeout(()=>{t.textContent=MODES[mode].title;renderOptions(mode);t.classList.remove('switching');l.classList.remove('switching');},180);
 }
 
-/* ─── Scale handle — pure CSS zoom, window never resizes ─ */
+/* ─── Scale handle ────────────────────────────────────── */
 (function(){
   const handle = document.getElementById('resize-handle');
   const card   = document.getElementById('card');
@@ -797,105 +790,78 @@ function switchMode(mode,btn){
     window._cardScale = s;
     card.style.zoom = s;
     localStorage.setItem('fm_scale', s);
+    return s;
   }
 
-  window._applyScale = applyZoom;
+  window._applyScale = (s) => {
+    const clamped = applyZoom(s);
+    if (window.electronAPI) window.electronAPI.scaleEnd(clamped);
+  };
 
   card.addEventListener('animationend', () => {
     clearAnim();
     try {
       const saved = parseFloat(localStorage.getItem('fm_scale'));
-      if (saved >= MIN_S && saved <= MAX_S) applyZoom(saved);
+      if (saved >= MIN_S && saved <= MAX_S){
+        applyZoom(saved);
+        if (window.electronAPI) window.electronAPI.scaleEnd(saved);
+      }
     } catch(e){}
-  }, {once: true});
+  }, {once:true});
 
-  function beginDrag(screenX){
+  function beginDrag(sx){
     clearAnim();
     dragging = true;
-    startX   = screenX;
-    startS   = parseFloat(card.style.zoom) || 1;
+    startX = sx;
+    startS = parseFloat(card.style.zoom) || 1;
     document.body.style.userSelect = 'none';
+    if (window.electronAPI) window.electronAPI.scaleStart();
   }
-  function moveDrag(screenX){
+  function moveDrag(sx){
     if(!dragging) return;
-    applyZoom(startS + (startX - screenX) / 300);
+    applyZoom(startS + (startX - sx) / 300);
   }
   function endDrag(){
     if(!dragging) return;
     dragging = false;
     document.body.style.userSelect = '';
+    if (window.electronAPI) window.electronAPI.scaleEnd(window._cardScale);
   }
 
   handle.addEventListener('mousedown',  e => { beginDrag(e.screenX); e.preventDefault(); });
-  document.addEventListener('mousemove', e => moveDrag(e.screenX));
+  document.addEventListener('mousemove', e => { if(dragging) moveDrag(e.screenX); });
   document.addEventListener('mouseup',   endDrag);
   handle.addEventListener('touchstart', e => { beginDrag(e.touches[0].screenX); e.preventDefault(); }, {passive:false});
-  document.addEventListener('touchmove', e => { if(!dragging) return; moveDrag(e.touches[0].screenX); e.preventDefault(); }, {passive:false});
+  document.addEventListener('touchmove', e => { if(dragging){ moveDrag(e.touches[0].screenX); e.preventDefault(); } }, {passive:false});
   document.addEventListener('touchend', endDrag);
 })();
 
-/* ─── Click-through transparent areas ───────────────── */
-// Forward mouse events through transparent parts of the window,
-// only capture when cursor is actually over the card.
-if (window.electronAPI) {
-  const card = document.getElementById('card');
-  document.addEventListener('mousemove', e => {
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const overCard = el && (el === card || card.contains(el));
-    window.electronAPI.setIgnoreMouseEvents(!overCard);
-  });
-}
-
-/* ─── Card bounds reporting — main process polls cursor against these ── */
-(function(){
-  if (!window.electronAPI) return;
-  const card = document.getElementById('card');
-  if (!card) return;
-
-  function sendBounds() {
-    const r = card.getBoundingClientRect();
-    window.electronAPI.cardBounds({ x: r.left, y: r.top, w: r.width, h: r.height });
-  }
-
-  // Send on load and whenever card changes
-  sendBounds();
-  new ResizeObserver(sendBounds).observe(card);
-  new MutationObserver(sendBounds).observe(card, { attributes: true, attributeFilter: ['class'] });
-  window.addEventListener('resize', sendBounds);
-})();
-
 /* ─── Drag to move (top-bar + corner) ───────────────── */
-let isDraggingWindow = false;
 (function(){
   const topBar = document.getElementById('top-bar');
   const corner = document.getElementById('drag-corner');
+  let dragging = false;
 
-  function startDrag(sx, sy, target) {
+  function startDrag(e, target){
     if (target && target.closest('button,input,.theme-switch,.minimize-bar,.top-bar-right')) return;
-    isDraggingWindow = true;
-    document.body.style.cursor = 'grabbing';
+    dragging = true;
     document.body.style.userSelect = 'none';
-    if (window.electronAPI) window.electronAPI.dragStart(sx, sy);
+    if (window.electronAPI) window.electronAPI.dragStart();
+    e.preventDefault();
   }
-  function moveDrag(sx, sy) {
-    if (!isDraggingWindow) return;
-    if (window.electronAPI) window.electronAPI.dragMove(sx, sy);
-  }
-  function endDrag() {
-    if (!isDraggingWindow) return;
-    isDraggingWindow = false;
-    document.body.style.cursor = '';
+  function endDrag(){
+    if(!dragging) return;
+    dragging = false;
     document.body.style.userSelect = '';
     if (window.electronAPI) window.electronAPI.dragEnd();
   }
 
-  if (topBar)
-    topBar.addEventListener('mousedown', e => startDrag(e.screenX, e.screenY, e.target));
-  if (corner)
-    corner.addEventListener('mousedown', e => { startDrag(e.screenX, e.screenY, null); e.preventDefault(); });
-
-  document.addEventListener('mousemove', e => moveDrag(e.screenX, e.screenY));
-  document.addEventListener('mouseup',   endDrag);
+  if (topBar) topBar.addEventListener('mousedown', e => startDrag(e, e.target));
+  if (corner) corner.addEventListener('mousedown', e => startDrag(e, null));
+  document.addEventListener('mouseup', endDrag);
+  document.addEventListener('touchend', endDrag);
+  if (topBar) topBar.addEventListener('touchstart', e => startDrag(e, e.target), {passive:false});
+  if (corner) corner.addEventListener('touchstart', e => startDrag(e, null), {passive:false});
 })();
 
 /* ─── Auto-updater UI ───────────────────────────────── */

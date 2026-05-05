@@ -2,10 +2,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform:       process.platform,
-  cardBounds:     (b)      => ipcRenderer.send('card-bounds', b),
-  dragStart:      (sx, sy) => ipcRenderer.send('drag-start', { sx, sy }),
-  dragMove:       (sx, sy) => ipcRenderer.send('drag-move',  { sx, sy }),
+  dragStart:      ()       => ipcRenderer.send('drag-start'),
   dragEnd:        ()       => ipcRenderer.send('drag-end'),
+  scaleStart:     ()       => ipcRenderer.send('scale-start'),
   scaleEnd:       (scale)  => ipcRenderer.send('scale-end', scale),
   closeApp:       ()       => ipcRenderer.send('close-window'),
   installUpdate:  ()       => ipcRenderer.send('install-update'),

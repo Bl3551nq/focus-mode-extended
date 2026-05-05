@@ -17,100 +17,114 @@ function saveWindowState(data) {
 let mainWin      = null;
 let isDragging   = false;
 let dragOffX     = 0, dragOffY = 0;
+let dragInterval = null;
 let currentScale = 1;
 
-const BASE_W = 360, BASE_H = 580;
+const BASE_W   = 360;
+const BASE_H   = 580;
 const MAX_SCALE = 1.8;
-const WIN_W  = Math.ceil(BASE_W * MAX_SCALE) + 80;
-const WIN_H  = Math.ceil(BASE_H * MAX_SCALE) + 80;
+const EXPAND_W = Math.ceil(BASE_W * MAX_SCALE) + 40;
+const EXPAND_H = Math.ceil(BASE_H * MAX_SCALE) + 40;
 
-// Card bounds in SCREEN coordinates — updated by renderer whenever card moves/resizes
-let cardBounds = { x: 0, y: 0, w: BASE_W, h: BASE_H };
-const PAD = 24; // generous hit padding so minimized pill is always catchable
+// Center point saved before expand so shrink lands exactly
+let scaleCX = 0, scaleCY = 0;
 
-/* ══════════════════════════════════════════════════
-   CURSOR POLLING — runs in main, no renderer events needed
-   Polls getCursorScreenPoint() every 16ms and compares
-   to card screen bounds — reliable on Windows
-══════════════════════════════════════════════════ */
-let wasOver = false;
+function winW(scale) { return Math.round(BASE_W * scale); }
+function winH(scale) { return Math.round(BASE_H * scale); }
 
-function startHitPoll() {
-  setInterval(() => {
-    if (!mainWin || isDragging) return;
-    const c = screen.getCursorScreenPoint();
-    const b = cardBounds;
-    const over =
-      c.x >= b.x - PAD && c.x <= b.x + b.w + PAD &&
-      c.y >= b.y - PAD && c.y <= b.y + b.h + PAD;
+function createWindow() {
+  const saved = loadWindowState();
+  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
 
-    if (over !== wasOver) {
-      wasOver = over;
-      mainWin.setIgnoreMouseEvents(!over, { forward: true });
-    }
-  }, 16);
+  let x = Math.round((sw - BASE_W) / 2);
+  let y = Math.round((sh - BASE_H) / 2);
+  let w = BASE_W, h = BASE_H;
+
+  if (saved) {
+    currentScale = saved.scale || 1;
+    w = winW(currentScale);
+    h = winH(currentScale);
+    if (saved.x != null) { x = saved.x; y = saved.y; }
+    else { x = Math.round((sw - w) / 2); y = Math.round((sh - h) / 2); }
+  }
+
+  mainWin = new BrowserWindow({
+    width: w, height: h, x, y,
+    minWidth: 180, minHeight: 260,
+    frame: false, transparent: true,
+    backgroundColor: '#00000000',
+    hasShadow: false, resizable: false,
+    alwaysOnTop: true, show: false,
+    icon: path.join(__dirname, 'build', 'icon.ico'),
+    webPreferences: {
+      nodeIntegration: false, contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+    roundedCorners: true,
+  });
+
+  // Window always exactly matches content — no transparent gaps, no click-through needed
+  mainWin.loadFile(path.join(__dirname, 'src', 'index.html'));
+  mainWin.once('ready-to-show', () => { mainWin.show(); mainWin.focus(); });
+  mainWin.on('closed', () => { mainWin = null; });
 }
 
-/* ══════════════════════════════════════════════════
-   CARD BOUNDS — renderer sends these whenever the
-   card layout changes (load, minimize, scale)
-══════════════════════════════════════════════════ */
-ipcMain.on('card-bounds', (e, bounds) => {
-  // bounds is in client (window-relative) coords — convert to screen
-  if (!mainWin) return;
-  const [wx, wy] = mainWin.getPosition();
-  cardBounds = {
-    x: wx + bounds.x,
-    y: wy + bounds.y,
-    w: bounds.w,
-    h: bounds.h,
-  };
-});
-
-/* ══════════════════════════════════════════════════
-   DRAG — direct screenX/Y, no polling needed
-══════════════════════════════════════════════════ */
-ipcMain.on('drag-start', (e, { sx, sy }) => {
+/* ── DRAG: 60fps polling, unclamped so it reaches every corner ── */
+ipcMain.on('drag-start', () => {
   if (!mainWin) return;
   isDragging = true;
-  mainWin.setIgnoreMouseEvents(false); // lock on during drag
+  const c = screen.getCursorScreenPoint();
   const [wx, wy] = mainWin.getPosition();
-  dragOffX = sx - wx;
-  dragOffY = sy - wy;
-});
-
-ipcMain.on('drag-move', (e, { sx, sy }) => {
-  if (!isDragging || !mainWin) return;
-  const nx = Math.round(sx - dragOffX);
-  const ny = Math.round(sy - dragOffY);
-  mainWin.setPosition(nx, ny);
-  // Update cardBounds x/y so hit-poll stays in sync during move
-  const [wx, wy] = mainWin.getPosition();
-  cardBounds.x = wx + (cardBounds.x - (nx - (nx - wx)));
-  cardBounds.y = wy + (cardBounds.y - (ny - (ny - wy)));
+  dragOffX = c.x - wx;
+  dragOffY = c.y - wy;
+  if (dragInterval) clearInterval(dragInterval);
+  dragInterval = setInterval(() => {
+    if (!isDragging || !mainWin) return;
+    const p = screen.getCursorScreenPoint();
+    mainWin.setPosition(Math.round(p.x - dragOffX), Math.round(p.y - dragOffY));
+  }, 8); // 120fps polling for smooth drag
 });
 
 ipcMain.on('drag-end', () => {
   isDragging = false;
-  wasOver    = false; // force re-evaluate on next poll
+  if (dragInterval) { clearInterval(dragInterval); dragInterval = null; }
   if (!mainWin) return;
   const [x, y] = mainWin.getPosition();
-  saveWindowState({ cx: x + WIN_W / 2, cy: y + WIN_H / 2, scale: currentScale });
+  const [w, h] = mainWin.getSize();
+  saveWindowState({ x, y, w, h, scale: currentScale });
 });
 
-/* ══════════════════════════════════════════════════
-   SCALE
-══════════════════════════════════════════════════ */
+/* ── SCALE: expand before drag, shrink after — anchored to center ── */
+ipcMain.on('scale-start', () => {
+  if (!mainWin) return;
+  const [x, y] = mainWin.getPosition();
+  const [w, h] = mainWin.getSize();
+  scaleCX = x + w / 2;
+  scaleCY = y + h / 2;
+  mainWin.setBounds({
+    x: Math.round(scaleCX - EXPAND_W / 2),
+    y: Math.round(scaleCY - EXPAND_H / 2),
+    width: EXPAND_W, height: EXPAND_H,
+  }, false);
+});
+
 ipcMain.on('scale-end', (e, scale) => {
-  currentScale = scale;
   if (!mainWin) return;
-  const [x, y] = mainWin.getPosition();
-  saveWindowState({ cx: x + WIN_W / 2, cy: y + WIN_H / 2, scale });
+  currentScale = scale;
+  const nw = winW(scale), nh = winH(scale);
+  mainWin.setBounds({
+    x: Math.round(scaleCX - nw / 2),
+    y: Math.round(scaleCY - nh / 2),
+    width: nw, height: nh,
+  }, false);
+  saveWindowState({
+    x: Math.round(scaleCX - nw / 2),
+    y: Math.round(scaleCY - nh / 2),
+    w: nw, h: nh, scale,
+  });
 });
 
-/* ══════════════════════════════════════════════════
-   MISC
-══════════════════════════════════════════════════ */
+/* ── MISC ── */
 ipcMain.on('close-window',   () => { if (mainWin) mainWin.close(); });
 ipcMain.on('install-update', () => { autoUpdater.quitAndInstall(); });
 
@@ -133,48 +147,6 @@ function setAutoLaunch() {
     openAtLogin: true, openAsHidden: false,
     name: 'Focus Mode Extended', path: process.execPath,
   });
-}
-
-/* ══════════════════════════════════════════════════
-   WINDOW
-══════════════════════════════════════════════════ */
-function createWindow() {
-  const saved = loadWindowState();
-  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
-
-  let centerX = sw / 2, centerY = sh / 2;
-  if (saved && saved.cx != null) {
-    centerX = saved.cx; centerY = saved.cy;
-    currentScale = saved.scale || 1;
-  }
-
-  const winX = Math.round(centerX - WIN_W / 2);
-  const winY = Math.round(centerY - WIN_H / 2);
-
-  mainWin = new BrowserWindow({
-    width: WIN_W, height: WIN_H, x: winX, y: winY,
-    minWidth: 100, minHeight: 100,
-    frame: false, transparent: true,
-    backgroundColor: '#00000000',
-    hasShadow: false, resizable: false,
-    alwaysOnTop: true, show: false,
-    icon: path.join(__dirname, 'build', 'icon.ico'),
-    webPreferences: {
-      nodeIntegration: false, contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
-    },
-    roundedCorners: true,
-  });
-
-  // Start with pass-through — poll will enable when cursor hits card
-  mainWin.setIgnoreMouseEvents(true, { forward: true });
-  mainWin.loadFile(path.join(__dirname, 'src', 'index.html'));
-  mainWin.once('ready-to-show', () => {
-    mainWin.show();
-    mainWin.focus();
-    startHitPoll();
-  });
-  mainWin.on('closed', () => { mainWin = null; });
 }
 
 app.whenReady().then(() => {
