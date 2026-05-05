@@ -15,7 +15,7 @@
 html, body {
   width:100%; height:100%;
   display:flex; align-items:center; justify-content:center;
-  overflow:clip;
+  overflow:visible;
   font-family:-apple-system,'Helvetica Neue',sans-serif;
   user-select:none;
   background: transparent;
@@ -827,46 +827,60 @@ function switchMode(mode,btn){
   document.addEventListener('touchend', endDrag);
 })();
 
+/* ─── Click-through transparent areas ───────────────── */
+// Forward mouse events through transparent parts of the window,
+// only capture when cursor is actually over the card.
+if (window.electronAPI) {
+  const card = document.getElementById('card');
+  document.addEventListener('mousemove', e => {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const overCard = el && (el === card || card.contains(el));
+    window.electronAPI.setIgnoreMouseEvents(!overCard);
+  });
+}
+
+/* ─── Mouse hit detection — pass clicks through transparent areas ── */
+(function(){
+  const card = document.getElementById('card');
+  if (!card || !window.electronAPI) return;
+  card.addEventListener('mouseenter', () => window.electronAPI.mouseEnter());
+  card.addEventListener('mouseleave', () => {
+    if (!isDraggingWindow) window.electronAPI.mouseLeave();
+  });
+})();
+
 /* ─── Drag to move (top-bar + corner) ───────────────── */
+let isDraggingWindow = false;
 (function(){
   const topBar = document.getElementById('top-bar');
   const corner = document.getElementById('drag-corner');
-  let dragging = false;
 
-  function startDrag(e){
-    // Don't drag if clicking a button or interactive child
-    if (e.target.closest('button, input, .theme-switch, .minimize-bar, .top-bar-right')) return;
-    dragging = true;
+  function startDrag(sx, sy, target) {
+    if (target && target.closest('button,input,.theme-switch,.minimize-bar,.top-bar-right')) return;
+    isDraggingWindow = true;
+    document.body.style.cursor = 'grabbing';
     document.body.style.userSelect = 'none';
-    if (window.electronAPI) window.electronAPI.dragStart();
-    e.preventDefault();
+    if (window.electronAPI) window.electronAPI.dragStart(sx, sy);
   }
-  function endDrag(){
-    if(!dragging) return;
-    dragging = false;
+  function moveDrag(sx, sy) {
+    if (!isDraggingWindow) return;
+    if (window.electronAPI) window.electronAPI.dragMove(sx, sy);
+  }
+  function endDrag() {
+    if (!isDraggingWindow) return;
+    isDraggingWindow = false;
+    document.body.style.cursor = '';
     document.body.style.userSelect = '';
     if (window.electronAPI) window.electronAPI.dragEnd();
   }
 
-  if (topBar){
-    topBar.addEventListener('mousedown', startDrag);
-    topBar.addEventListener('touchstart', startDrag, {passive:false});
-  }
-  if (corner){
-    corner.addEventListener('mousedown', e => {
-      dragging = true;
-      document.body.style.userSelect = 'none';
-      if (window.electronAPI) window.electronAPI.dragStart();
-      e.preventDefault();
-    });
-    corner.addEventListener('touchstart', e => {
-      dragging = true;
-      if (window.electronAPI) window.electronAPI.dragStart();
-      e.preventDefault();
-    }, {passive:false});
-  }
-  document.addEventListener('mouseup',  endDrag);
-  document.addEventListener('touchend', endDrag);
+  if (topBar)
+    topBar.addEventListener('mousedown', e => startDrag(e.screenX, e.screenY, e.target));
+  if (corner)
+    corner.addEventListener('mousedown', e => { startDrag(e.screenX, e.screenY, null); e.preventDefault(); });
+
+  document.addEventListener('mousemove', e => moveDrag(e.screenX, e.screenY));
+  document.addEventListener('mouseup',   endDrag);
 })();
 
 /* ─── Auto-updater UI ───────────────────────────────── */

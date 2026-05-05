@@ -17,42 +17,35 @@ function saveWindowState(data) {
 let mainWin = null;
 const BASE_W = 360, BASE_H = 580;
 const MAX_SCALE = 1.8;
-const DRAG_W = Math.ceil(BASE_W * MAX_SCALE) + 40;
-const DRAG_H = Math.ceil(BASE_H * MAX_SCALE) + 40;
+// Window stays at this size always — transparent overflow passes clicks through
+const WIN_W = Math.ceil(BASE_W * MAX_SCALE) + 60;
+const WIN_H = Math.ceil(BASE_H * MAX_SCALE) + 60;
 
-// Center point anchored before scale expansion — ensures no drift on shrink
-let scaleCenterX = 0, scaleCenterY = 0;
 let currentScale = 1;
-
-// Drag state
-let isDragging = false;
+let isDragging   = false;
 let dragOffX = 0, dragOffY = 0;
-let dragInterval = null;
 
 function createWindow() {
   const saved = loadWindowState();
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
-  let winX = Math.round((sw - BASE_W) / 2);
-  let winY = Math.round((sh - BASE_H) / 2);
-  let winW = BASE_W, winH = BASE_H;
 
-  if (saved && saved.x != null) {
-    const onScreen = screen.getAllDisplays().some(d => {
-      const b = d.workArea;
-      return saved.x >= b.x - 50 && saved.y >= b.y - 50 &&
-             saved.x < b.x + b.width && saved.y < b.y + b.height;
-    });
-    if (onScreen) {
-      winX = saved.x; winY = saved.y;
-      winW = saved.width  || BASE_W;
-      winH = saved.height || BASE_H;
-      currentScale = saved.scale || 1;
-    }
+  // Window is always WIN_W x WIN_H — position tracks the card center
+  let centerX = sw / 2;
+  let centerY = sh / 2;
+
+  if (saved && saved.cx != null) {
+    centerX = saved.cx;
+    centerY = saved.cy;
+    currentScale = saved.scale || 1;
   }
 
+  const winX = Math.round(centerX - WIN_W / 2);
+  const winY = Math.round(centerY - WIN_H / 2);
+
   mainWin = new BrowserWindow({
-    width: winW, height: winH, x: winX, y: winY,
-    minWidth: 100, minHeight: 100,
+    width:  WIN_W,
+    height: WIN_H,
+    x: winX, y: winY,
     frame: false, transparent: true,
     backgroundColor: '#00000000',
     hasShadow: false,
@@ -67,86 +60,71 @@ function createWindow() {
     roundedCorners: true,
   });
 
+  // Transparent areas pass mouse events through to apps beneath
+  mainWin.setIgnoreMouseEvents(true, { forward: true });
+
   mainWin.loadFile(path.join(__dirname, 'src', 'index.html'));
   mainWin.once('ready-to-show', () => { mainWin.show(); mainWin.focus(); });
   mainWin.on('closed', () => { mainWin = null; });
 }
 
-/* ═══════════════════════════════════════════════════
-   DRAG — 60fps polling from OS cursor, no bounds clamp
-   so window moves freely to every screen corner
-═══════════════════════════════════════════════════ */
-ipcMain.on('drag-start', () => {
-  if (!mainWin) return;
-  const cursor = screen.getCursorScreenPoint();
-  const [wx, wy] = mainWin.getPosition();
-  dragOffX = cursor.x - wx;
-  dragOffY = cursor.y - wy;
-  isDragging = true;
+/* ══════════════════════════════════════════════════
+   MOUSE HIT DETECTION
+   Renderer tells us when cursor enters/leaves card
+   so we toggle mouse capture on/off instantly
+══════════════════════════════════════════════════ */
+ipcMain.on('mouse-enter', () => {
+  if (mainWin) mainWin.setIgnoreMouseEvents(false);
+});
+ipcMain.on('mouse-leave', () => {
+  if (!isDragging && mainWin)
+    mainWin.setIgnoreMouseEvents(true, { forward: true });
+});
 
-  if (dragInterval) clearInterval(dragInterval);
-  dragInterval = setInterval(() => {
-    if (!isDragging || !mainWin) return;
-    const c = screen.getCursorScreenPoint();
-    // No clamping — let window move anywhere on screen
-    mainWin.setPosition(
-      Math.round(c.x - dragOffX),
-      Math.round(c.y - dragOffY)
-    );
-  }, 16);
+/* ══════════════════════════════════════════════════
+   DRAG — renderer sends screenX/Y directly on mousemove
+   No polling, no jitter, no wobble
+══════════════════════════════════════════════════ */
+ipcMain.on('drag-start', (e, { sx, sy }) => {
+  if (!mainWin) return;
+  isDragging = true;
+  const [wx, wy] = mainWin.getPosition();
+  dragOffX = sx - wx;
+  dragOffY = sy - wy;
+});
+
+ipcMain.on('drag-move', (e, { sx, sy }) => {
+  if (!isDragging || !mainWin) return;
+  mainWin.setPosition(
+    Math.round(sx - dragOffX),
+    Math.round(sy - dragOffY)
+  );
 });
 
 ipcMain.on('drag-end', () => {
   isDragging = false;
-  if (dragInterval) { clearInterval(dragInterval); dragInterval = null; }
+  if (!mainWin) return;
+  mainWin.setIgnoreMouseEvents(true, { forward: true });
+  const [x, y] = mainWin.getPosition();
+  const cx = x + WIN_W / 2;
+  const cy = y + WIN_H / 2;
+  saveWindowState({ cx, cy, scale: currentScale });
+});
+
+/* ══════════════════════════════════════════════════
+   SCALE — window never changes size (always WIN_W x WIN_H)
+   so content is never clipped. Just save new scale.
+══════════════════════════════════════════════════ */
+ipcMain.on('scale-end', (e, scale) => {
+  currentScale = scale;
   if (!mainWin) return;
   const [x, y] = mainWin.getPosition();
-  const [w, h] = mainWin.getSize();
-  saveWindowState({ x, y, width: w, height: h, scale: currentScale });
+  saveWindowState({ cx: x + WIN_W / 2, cy: y + WIN_H / 2, scale });
 });
 
-/* ═══════════════════════════════════════════════════
-   SCALE — anchor to center point so shrink lands
-   exactly where expand started — zero twitch
-═══════════════════════════════════════════════════ */
-ipcMain.on('scale-start', () => {
-  if (!mainWin) return;
-  const [wx, wy] = mainWin.getPosition();
-  const [ww, wh] = mainWin.getSize();
-  // Record the center of the CURRENT window (before expansion)
-  scaleCenterX = wx + ww / 2;
-  scaleCenterY = wy + wh / 2;
-  // Expand symmetrically around that center
-  mainWin.setBounds({
-    x: Math.round(scaleCenterX - DRAG_W / 2),
-    y: Math.round(scaleCenterY - DRAG_H / 2),
-    width: DRAG_W,
-    height: DRAG_H,
-  }, false);
-});
-
-ipcMain.on('scale-end', (e, scale) => {
-  if (!mainWin) return;
-  currentScale = scale;
-  const newW = Math.round(BASE_W * scale);
-  const newH = Math.round(BASE_H * scale);
-  // Shrink back anchored to the SAME center point — no drift, no twitch
-  mainWin.setBounds({
-    x: Math.round(scaleCenterX - newW / 2),
-    y: Math.round(scaleCenterY - newH / 2),
-    width: newW,
-    height: newH,
-  }, false);
-  saveWindowState({
-    x: Math.round(scaleCenterX - newW / 2),
-    y: Math.round(scaleCenterY - newH / 2),
-    width: newW, height: newH, scale,
-  });
-});
-
-/* ═══════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════
    MISC
-═══════════════════════════════════════════════════ */
+══════════════════════════════════════════════════ */
 ipcMain.on('close-window',   () => { if (mainWin) mainWin.close(); });
 ipcMain.on('install-update', () => { autoUpdater.quitAndInstall(); });
 
