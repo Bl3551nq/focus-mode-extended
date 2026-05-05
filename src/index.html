@@ -841,11 +841,38 @@ if (window.electronAPI) {
 
 /* ─── Mouse hit detection — pass clicks through transparent areas ── */
 (function(){
+  if (!window.electronAPI) return;
+
+  // Use a padded zone around the card so minimized state has generous hit area
   const card = document.getElementById('card');
-  if (!card || !window.electronAPI) return;
-  card.addEventListener('mouseenter', () => window.electronAPI.mouseEnter());
-  card.addEventListener('mouseleave', () => {
-    if (!isDraggingWindow) window.electronAPI.mouseLeave();
+  if (!card) return;
+
+  let inside = false;
+
+  function check(e) {
+    const rect = card.getBoundingClientRect();
+    const PAD  = 18; // generous padding around card
+    const over =
+      e.clientX >= rect.left   - PAD &&
+      e.clientX <= rect.right  + PAD &&
+      e.clientY >= rect.top    - PAD &&
+      e.clientY <= rect.bottom + PAD;
+
+    if (over && !inside) {
+      inside = true;
+      window.electronAPI.mouseEnter();
+    } else if (!over && inside && !isDraggingWindow) {
+      inside = false;
+      window.electronAPI.mouseLeave();
+    }
+  }
+
+  // Run on every mousemove so we always track correctly
+  document.addEventListener('mousemove', check);
+
+  // Also check immediately in case cursor starts over card
+  card.addEventListener('mouseenter', () => {
+    if (!inside) { inside = true; window.electronAPI.mouseEnter(); }
   });
 })();
 

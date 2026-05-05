@@ -77,6 +77,7 @@ ipcMain.on('mouse-enter', () => {
   if (mainWin) mainWin.setIgnoreMouseEvents(false);
 });
 ipcMain.on('mouse-leave', () => {
+  // Never ignore mouse events while dragging — cursor may leave card bounds during drag
   if (!isDragging && mainWin)
     mainWin.setIgnoreMouseEvents(true, { forward: true });
 });
@@ -88,6 +89,7 @@ ipcMain.on('mouse-leave', () => {
 ipcMain.on('drag-start', (e, { sx, sy }) => {
   if (!mainWin) return;
   isDragging = true;
+  mainWin.setIgnoreMouseEvents(false); // never lose capture during drag
   const [wx, wy] = mainWin.getPosition();
   dragOffX = sx - wx;
   dragOffY = sy - wy;
