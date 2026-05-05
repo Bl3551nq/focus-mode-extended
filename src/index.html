@@ -836,32 +836,33 @@ function switchMode(mode,btn){
   document.addEventListener('touchend', endDrag);
 })();
 
-/* ─── Drag to move (top-bar + corner) ───────────────── */
+/* ─── Drag — entire card body, mousedown to activate ─── */
 (function(){
-  const topBar = document.getElementById('top-bar');
-  const corner = document.getElementById('drag-corner');
+  const card = document.getElementById('card');
+  if (!card) return;
   let dragging = false;
 
-  function startDrag(e, target){
-    if (target && target.closest('button,input,.theme-switch,.minimize-bar,.top-bar-right')) return;
+  function startDrag(e) {
+    // Skip interactive elements
+    if (e.target.closest('button, input, .option, .icon-btn, .theme-switch, .minimize-bar, .resize-handle, .scroll-area, .add-btn, .icon-picker, select, a')) return;
     dragging = true;
     document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'grabbing';
     if (window.electronAPI) window.electronAPI.dragStart();
     e.preventDefault();
   }
-  function endDrag(){
-    if(!dragging) return;
+  function endDrag() {
+    if (!dragging) return;
     dragging = false;
     document.body.style.userSelect = '';
+    document.body.style.cursor = '';
     if (window.electronAPI) window.electronAPI.dragEnd();
   }
 
-  if (topBar) topBar.addEventListener('mousedown', e => startDrag(e, e.target));
-  if (corner) corner.addEventListener('mousedown', e => startDrag(e, null));
+  card.addEventListener('mousedown', startDrag);
   document.addEventListener('mouseup', endDrag);
+  card.addEventListener('touchstart', startDrag, {passive: false});
   document.addEventListener('touchend', endDrag);
-  if (topBar) topBar.addEventListener('touchstart', e => startDrag(e, e.target), {passive:false});
-  if (corner) corner.addEventListener('touchstart', e => startDrag(e, null), {passive:false});
 })();
 
 /* ─── Auto-updater UI ───────────────────────────────── */

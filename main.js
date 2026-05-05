@@ -40,37 +40,29 @@ function winH(scale) { return Math.round(BASE_H * scale); }
 function createWindow() {
   const saved = loadWindowState();
   const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: sw, height: sh } = primaryDisplay.workAreaSize;
-  const wa = primaryDisplay.workArea;
+  const wa = primaryDisplay.workArea; // includes x,y offset for taskbar
 
-  let scale = 1;
-  if (saved && saved.scale) scale = saved.scale;
+  let scale = (saved && saved.scale) ? saved.scale : 1;
+  currentScale = scale;
 
   let w = winW(scale);
   let h = winH(scale);
 
-  // Always default to center
-  let x = wa.x + Math.round((sw - w) / 2);
-  let y = wa.y + Math.round((sh - h) / 2);
+  // Default: centered within the usable work area
+  let x = wa.x + Math.round((wa.width  - w) / 2);
+  let y = wa.y + Math.round((wa.height - h) / 2);
 
-  // Only restore saved position if it's fully visible on a connected screen
+  // Restore saved position only if window fits fully on a connected screen
   if (saved && saved.x != null && saved.y != null) {
-    const allDisplays = screen.getAllDisplays();
-    const fullyVisible = allDisplays.some(d => {
+    const fits = screen.getAllDisplays().some(d => {
       const b = d.workArea;
       return saved.x >= b.x &&
              saved.y >= b.y &&
              saved.x + w <= b.x + b.width &&
              saved.y + h <= b.y + b.height;
     });
-    if (fullyVisible) {
-      x = saved.x;
-      y = saved.y;
-    }
-    // else: use centered defaults above
+    if (fits) { x = saved.x; y = saved.y; }
   }
-
-  currentScale = scale;
 
   mainWin = new BrowserWindow({
     width: w, height: h, x, y,
