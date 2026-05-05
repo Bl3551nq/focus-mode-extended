@@ -7,11 +7,16 @@ const userDataPath    = app.getPath('userData');
 const windowStatePath = path.join(userDataPath, 'window-state.json');
 
 function loadWindowState() {
-  try { return JSON.parse(fs.readFileSync(windowStatePath, 'utf8')); }
+  try {
+    const data = JSON.parse(fs.readFileSync(windowStatePath, 'utf8'));
+    // Reset if state is from old builds that had wrong position logic
+    if (!data || data.version !== 2) return null;
+    return data;
+  }
   catch { return null; }
 }
 function saveWindowState(data) {
-  try { fs.writeFileSync(windowStatePath, JSON.stringify(data)); } catch {}
+  try { fs.writeFileSync(windowStatePath, JSON.stringify({ ...data, version: 2 })); } catch {}
 }
 
 let mainWin      = null;
@@ -34,19 +39,38 @@ function winH(scale) { return Math.round(BASE_H * scale); }
 
 function createWindow() {
   const saved = loadWindowState();
-  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: sw, height: sh } = primaryDisplay.workAreaSize;
+  const wa = primaryDisplay.workArea;
 
-  let x = Math.round((sw - BASE_W) / 2);
-  let y = Math.round((sh - BASE_H) / 2);
-  let w = BASE_W, h = BASE_H;
+  let scale = 1;
+  if (saved && saved.scale) scale = saved.scale;
 
-  if (saved) {
-    currentScale = saved.scale || 1;
-    w = winW(currentScale);
-    h = winH(currentScale);
-    if (saved.x != null) { x = saved.x; y = saved.y; }
-    else { x = Math.round((sw - w) / 2); y = Math.round((sh - h) / 2); }
+  let w = winW(scale);
+  let h = winH(scale);
+
+  // Always default to center
+  let x = wa.x + Math.round((sw - w) / 2);
+  let y = wa.y + Math.round((sh - h) / 2);
+
+  // Only restore saved position if it's fully visible on a connected screen
+  if (saved && saved.x != null && saved.y != null) {
+    const allDisplays = screen.getAllDisplays();
+    const fullyVisible = allDisplays.some(d => {
+      const b = d.workArea;
+      return saved.x >= b.x &&
+             saved.y >= b.y &&
+             saved.x + w <= b.x + b.width &&
+             saved.y + h <= b.y + b.height;
+    });
+    if (fullyVisible) {
+      x = saved.x;
+      y = saved.y;
+    }
+    // else: use centered defaults above
   }
+
+  currentScale = scale;
 
   mainWin = new BrowserWindow({
     width: w, height: h, x, y,
