@@ -683,6 +683,13 @@ function toggleMinimize(){
   const card=document.getElementById('card');
   card.classList.toggle('minimized');
   if(card.classList.contains('minimized') && editMode) toggleEdit();
+  // Tell main the new card size so hit-poll updates immediately
+  setTimeout(() => {
+    if (window.electronAPI) {
+      const r = card.getBoundingClientRect();
+      window.electronAPI.cardBounds({ x: r.left, y: r.top, w: r.width, h: r.height });
+    }
+  }, 320); // after CSS transition
 }
 
 /* ─── Edit ───────────────────────────────────────────── */
@@ -839,41 +846,22 @@ if (window.electronAPI) {
   });
 }
 
-/* ─── Mouse hit detection — pass clicks through transparent areas ── */
+/* ─── Card bounds reporting — main process polls cursor against these ── */
 (function(){
   if (!window.electronAPI) return;
-
-  // Use a padded zone around the card so minimized state has generous hit area
   const card = document.getElementById('card');
   if (!card) return;
 
-  let inside = false;
-
-  function check(e) {
-    const rect = card.getBoundingClientRect();
-    const PAD  = 18; // generous padding around card
-    const over =
-      e.clientX >= rect.left   - PAD &&
-      e.clientX <= rect.right  + PAD &&
-      e.clientY >= rect.top    - PAD &&
-      e.clientY <= rect.bottom + PAD;
-
-    if (over && !inside) {
-      inside = true;
-      window.electronAPI.mouseEnter();
-    } else if (!over && inside && !isDraggingWindow) {
-      inside = false;
-      window.electronAPI.mouseLeave();
-    }
+  function sendBounds() {
+    const r = card.getBoundingClientRect();
+    window.electronAPI.cardBounds({ x: r.left, y: r.top, w: r.width, h: r.height });
   }
 
-  // Run on every mousemove so we always track correctly
-  document.addEventListener('mousemove', check);
-
-  // Also check immediately in case cursor starts over card
-  card.addEventListener('mouseenter', () => {
-    if (!inside) { inside = true; window.electronAPI.mouseEnter(); }
-  });
+  // Send on load and whenever card changes
+  sendBounds();
+  new ResizeObserver(sendBounds).observe(card);
+  new MutationObserver(sendBounds).observe(card, { attributes: true, attributeFilter: ['class'] });
+  window.addEventListener('resize', sendBounds);
 })();
 
 /* ─── Drag to move (top-bar + corner) ───────────────── */
