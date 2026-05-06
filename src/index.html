@@ -381,6 +381,168 @@ body.editing .icon-btn::after{
 .update-install-btn:hover{ background:rgba(255,255,255,0.35); }
 .update-install-btn.downloading{ opacity:0.6; pointer-events:none; }
 .card.light .update-banner{ background:linear-gradient(135deg,rgba(80,20,200,0.95),rgba(160,10,60,0.95)); }
+
+/* ═══════════════════════════════════════════════════════
+   LICENSE SCREEN
+═══════════════════════════════════════════════════════ */
+.license-screen{
+  position:fixed; inset:0; z-index:9999;
+  background:rgba(10,6,20,0.97);
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  padding:28px 22px; gap:14px;
+  border-radius:28px;
+}
+.license-logo{ width:52px; height:52px; margin-bottom:4px; }
+.license-title{ font-size:17px; font-weight:700; color:#fff; letter-spacing:0.01em; }
+.license-sub{ font-size:11px; color:rgba(255,255,255,0.4); text-align:center; line-height:1.5; }
+.license-input{
+  width:100%; padding:11px 14px;
+  background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12);
+  border-radius:12px; color:#fff; font-size:14px; font-family:monospace;
+  letter-spacing:0.08em; text-align:center; outline:none;
+  transition:border-color 0.2s;
+}
+.license-input:focus{ border-color:rgba(150,80,255,0.6); }
+.license-input.error{ border-color:rgba(255,60,60,0.7); animation:shake 0.3s ease; }
+@keyframes shake{
+  0%,100%{transform:translateX(0);}
+  25%{transform:translateX(-6px);}
+  75%{transform:translateX(6px);}
+}
+.license-btn{
+  width:100%; padding:12px; border-radius:12px;
+  background:linear-gradient(135deg,rgba(110,0,210,0.9),rgba(180,30,80,0.9));
+  color:#fff; font-size:14px; font-weight:600; border:none; cursor:pointer;
+  transition:opacity 0.15s;
+}
+.license-btn:hover{ opacity:0.85; }
+.license-hint{ font-size:10px; color:rgba(255,255,255,0.25); text-align:center; }
+
+/* ═══════════════════════════════════════════════════════
+   THEME SWITCHER (multi-theme)
+═══════════════════════════════════════════════════════ */
+.theme-picker{
+  display:flex; gap:6px; align-items:center;
+}
+.theme-dot{
+  width:14px; height:14px; border-radius:50%;
+  cursor:pointer; border:2px solid transparent;
+  transition:transform 0.15s, border-color 0.15s;
+  flex-shrink:0;
+}
+.theme-dot:hover{ transform:scale(1.2); }
+.theme-dot.active{ border-color:#fff; transform:scale(1.15); }
+.theme-dot[data-theme="dark"]   { background:#1a0533; }
+.theme-dot[data-theme="light"]  { background:#e8e4f5; }
+.theme-dot[data-theme="blue"]   { background:#001a4d; }
+.theme-dot[data-theme="black"]  { background:#000; }
+.theme-dot[data-theme="forest"] { background:#0a1f0a; }
+
+/* ═══════════════════════════════════════════════════════
+   COLOR THEMES
+═══════════════════════════════════════════════════════ */
+/* Dark (default) — already defined */
+.card[data-theme="blue"]{
+  background:rgba(0,10,40,0.96);
+  --accent:rgba(0,120,255,0.9); --accent-soft:rgba(0,100,255,0.15);
+  --text:#e8f0ff; --text-dim:rgba(180,200,255,0.4); --text-mid:rgba(180,200,255,0.75);
+  --divider:rgba(255,255,255,0.06); --icon-idle:rgba(255,255,255,0.07);
+  --edit-bg:rgba(255,255,255,0.08); --selected-bg:rgba(0,100,255,0.15);
+  --selected-border:rgba(0,120,255,0.35); --add-bg:rgba(255,255,255,0.05);
+}
+.card[data-theme="black"]{
+  background:rgba(4,4,4,0.99);
+  --accent:rgba(200,200,200,0.9); --accent-soft:rgba(255,255,255,0.08);
+  --text:#fff; --text-dim:rgba(255,255,255,0.3); --text-mid:rgba(255,255,255,0.65);
+  --divider:rgba(255,255,255,0.06); --icon-idle:rgba(255,255,255,0.06);
+  --edit-bg:rgba(255,255,255,0.07); --selected-bg:rgba(255,255,255,0.1);
+  --selected-border:rgba(255,255,255,0.25); --add-bg:rgba(255,255,255,0.04);
+}
+.card[data-theme="forest"]{
+  background:rgba(4,16,4,0.97);
+  --accent:rgba(50,200,80,0.9); --accent-soft:rgba(50,200,80,0.15);
+  --text:#e8ffe8; --text-dim:rgba(150,230,150,0.4); --text-mid:rgba(150,230,150,0.75);
+  --divider:rgba(255,255,255,0.06); --icon-idle:rgba(255,255,255,0.07);
+  --edit-bg:rgba(255,255,255,0.08); --selected-bg:rgba(50,200,80,0.15);
+  --selected-border:rgba(50,200,80,0.35); --add-bg:rgba(255,255,255,0.04);
+}
+.card[data-theme="light"]{
+  background:rgba(245,245,250,0.98);
+  --accent:rgba(110,0,210,0.9); --accent-soft:rgba(130,0,255,0.12);
+  --text:#111; --text-dim:rgba(0,0,0,0.35); --text-mid:rgba(0,0,0,0.7);
+  --divider:rgba(0,0,0,0.08); --icon-idle:rgba(0,0,0,0.06);
+  --edit-bg:rgba(0,0,0,0.06); --selected-bg:rgba(110,0,210,0.1);
+  --selected-border:rgba(110,0,210,0.3); --add-bg:rgba(0,0,0,0.04);
+}
+
+/* ═══════════════════════════════════════════════════════
+   SESSION TIMER
+═══════════════════════════════════════════════════════ */
+.timer-bar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:7px 10px; border-radius:12px;
+  background:var(--add-bg); margin-bottom:6px;
+  border:1px solid var(--divider); flex-shrink:0;
+}
+.timer-display{
+  font-size:15px; font-weight:600; color:var(--text);
+  font-family:monospace; letter-spacing:0.05em;
+}
+.timer-label{ font-size:9px; color:var(--text-dim); letter-spacing:0.1em; text-transform:uppercase; }
+.timer-controls{ display:flex; gap:4px; }
+.timer-btn{
+  width:26px; height:26px; border-radius:8px;
+  background:var(--edit-bg); border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  color:var(--text-dim); transition:background 0.15s, color 0.15s;
+}
+.timer-btn:hover{ background:var(--accent-soft); color:var(--text); }
+.timer-btn svg{ width:11px; height:11px; stroke:currentColor; fill:none; stroke-width:2.2; stroke-linecap:round; }
+.timer-bar.running .timer-display{ color:var(--accent); }
+
+/* ═══════════════════════════════════════════════════════
+   NOTES FIELD
+═══════════════════════════════════════════════════════ */
+.notes-section{ flex-shrink:0; margin-top:4px; }
+.notes-toggle{
+  width:100%; display:flex; align-items:center; justify-content:space-between;
+  padding:6px 10px; border-radius:10px; background:transparent;
+  border:none; cursor:pointer; color:var(--text-dim);
+  font-size:10px; letter-spacing:0.1em; text-transform:uppercase;
+  transition:color 0.15s;
+}
+.notes-toggle:hover{ color:var(--text-mid); }
+.notes-toggle svg{ width:12px; height:12px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; transition:transform 0.2s; }
+.notes-toggle.open svg{ transform:rotate(180deg); }
+.notes-area{
+  max-height:0; overflow:hidden;
+  transition:max-height 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+.notes-area.open{ max-height:120px; }
+.notes-textarea{
+  width:100%; min-height:72px; padding:9px 10px;
+  background:var(--add-bg); border:1px solid var(--divider);
+  border-radius:10px; color:var(--text); font-size:12px;
+  line-height:1.5; resize:none; outline:none;
+  font-family:-apple-system,'Helvetica Neue',sans-serif;
+  transition:border-color 0.2s;
+}
+.notes-textarea:focus{ border-color:rgba(150,80,255,0.4); }
+.notes-textarea::placeholder{ color:var(--text-dim); }
+
+/* ═══════════════════════════════════════════════════════
+   RESET BUTTON
+═══════════════════════════════════════════════════════ */
+.reset-btn{
+  display:flex; align-items:center; gap:6px;
+  width:100%; padding:9px 10px; border-radius:10px;
+  background:transparent; border:1px solid var(--divider);
+  color:var(--text-dim); font-size:11px; cursor:pointer;
+  margin-top:4px; transition:all 0.15s; flex-shrink:0;
+}
+.reset-btn:hover{ background:rgba(255,60,60,0.1); border-color:rgba(255,60,60,0.3); color:rgba(255,100,100,0.9); }
+.reset-btn svg{ width:12px; height:12px; stroke:currentColor; fill:none; stroke-width:2.2; stroke-linecap:round; }
 /* ── Drag cursor only applied via JS during actual mousedown ── */
 .drag-corner{
   position:absolute; bottom:0; left:0;
@@ -419,22 +581,13 @@ button, input, .option, .icon-btn, .edit-toggle, .close-btn,
   <!-- Top bar: theme switch | minimize pill | edit button -->
   <div class="top-bar" id="top-bar">
 
-    <!-- Theme toggle (left) -->
-    <div class="theme-switch" id="theme-switch" onclick="toggleTheme()">
-      <div class="theme-switch-knob" id="theme-knob">
-        <!-- sun icon (dark mode) -->
-        <svg id="theme-icon" viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="5"/>
-          <line x1="12" y1="1" x2="12" y2="3"/>
-          <line x1="12" y1="21" x2="12" y2="23"/>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-          <line x1="1" y1="12" x2="3" y2="12"/>
-          <line x1="21" y1="12" x2="23" y2="12"/>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-        </svg>
-      </div>
+    <!-- Theme picker (left) -->
+    <div class="theme-picker" id="theme-picker">
+      <div class="theme-dot active" data-theme="dark"   onclick="setTheme('dark')"   title="Dark"></div>
+      <div class="theme-dot"        data-theme="blue"   onclick="setTheme('blue')"   title="Blue"></div>
+      <div class="theme-dot"        data-theme="black"  onclick="setTheme('black')"  title="Pure Black"></div>
+      <div class="theme-dot"        data-theme="forest" onclick="setTheme('forest')" title="Forest"></div>
+      <div class="theme-dot"        data-theme="light"  onclick="setTheme('light')"  title="Light"></div>
     </div>
 
     <!-- Minimize pill (center — absolute) -->
@@ -519,6 +672,22 @@ button, input, .option, .icon-btn, .edit-toggle, .close-btn,
 
   <div class="divider"></div>
 
+  <!-- Session Timer -->
+  <div class="timer-bar" id="timer-bar">
+    <div>
+      <div class="timer-label">Session</div>
+      <div class="timer-display" id="timer-display">00:00:00</div>
+    </div>
+    <div class="timer-controls">
+      <button class="timer-btn" onclick="timerToggle()" id="timer-play-btn" title="Start/Pause">
+        <svg id="timer-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none"/></svg>
+      </button>
+      <button class="timer-btn" onclick="timerReset()" title="Reset">
+        <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+      </button>
+    </div>
+  </div>
+
   <div class="scroll-area">
     <ul class="options" id="options-list"></ul>
     <button class="add-btn" onclick="addOption()">
@@ -527,11 +696,203 @@ button, input, .option, .icon-btn, .edit-toggle, .close-btn,
     </button>
   </div>
 
+  <!-- Reset checklist -->
+  <button class="reset-btn" onclick="resetChecklist()">
+    <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+    Reset session
+  </button>
+
+  <!-- Notes -->
+  <div class="notes-section">
+    <button class="notes-toggle" id="notes-toggle" onclick="toggleNotes()">
+      Notes
+      <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div class="notes-area" id="notes-area">
+      <textarea class="notes-textarea" id="notes-textarea" placeholder="Quick trade notes…" oninput="saveNotes()"></textarea>
+    </div>
+  </div>
+
+</div>
+
+<!-- License Screen (shown over everything on first launch) -->
+<div class="license-screen" id="license-screen" style="display:none">
+  <svg class="license-logo" viewBox="0 0 100 100">
+    <circle cx="50" cy="50" r="45" fill="rgba(110,0,210,0.3)" stroke="rgba(150,80,255,0.5)" stroke-width="2"/>
+    <circle cx="50" cy="50" r="22" fill="rgba(255,46,52,0.85)"/>
+    <circle cx="50" cy="50" r="10" fill="rgba(255,120,120,0.9)"/>
+  </svg>
+  <div class="license-title">Focus Mode Extended</div>
+  <div class="license-sub">Enter your license key to activate.<br>Find it in your Gumroad receipt.</div>
+  <input class="license-input" id="license-input" type="text" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19" oninput="formatLicenseKey(this)" onkeydown="if(event.key==='Enter') activateLicense()"/>
+  <button class="license-btn" onclick="activateLicense()">Activate</button>
+  <div class="license-hint">License is stored locally. One key per device.</div>
 </div>
 
 <script>
 /* ─── State ─────────────────────────────────────────── */
-let currentMode='sync', editMode=false, isLight=false;
+let currentMode='sync', editMode=false, currentTheme='dark';
+
+/* ═══════════════════════════════════════════════════════
+   LICENSE
+═══════════════════════════════════════════════════════ */
+async function checkLicense(){
+  if (!window.electronAPI) return; // browser preview — skip
+  const res = await window.electronAPI.checkLicense();
+  if (!res.ok) {
+    document.getElementById('license-screen').style.display = 'flex';
+  }
+}
+
+function formatLicenseKey(inp){
+  let v = inp.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase().slice(0,16);
+  let parts = v.match(/.{1,4}/g) || [];
+  inp.value = parts.join('-');
+}
+
+async function activateLicense(){
+  const inp = document.getElementById('license-input');
+  const key = inp.value;
+  const res = await window.electronAPI.validateLicense(key);
+  if (res.ok){
+    document.getElementById('license-screen').style.display = 'none';
+  } else {
+    inp.classList.add('error');
+    setTimeout(() => inp.classList.remove('error'), 600);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   THEMES
+═══════════════════════════════════════════════════════ */
+function setTheme(theme){
+  currentTheme = theme;
+  const card = document.getElementById('card');
+  card.setAttribute('data-theme', theme);
+  // Update active dot
+  document.querySelectorAll('.theme-dot').forEach(d => {
+    d.classList.toggle('active', d.dataset.theme === theme);
+  });
+  // Light theme adjustments
+  const isLight = theme === 'light';
+  card.classList.toggle('light', isLight);
+  // Picker dots contrast on light
+  document.querySelector('.theme-picker').style.filter = isLight ? 'none' : 'none';
+  autoSave();
+}
+
+/* ═══════════════════════════════════════════════════════
+   TIMER
+═══════════════════════════════════════════════════════ */
+let timerSeconds = 0, timerRunning = false, timerInterval = null;
+
+function timerToggle(){
+  timerRunning = !timerRunning;
+  const bar  = document.getElementById('timer-bar');
+  const icon = document.getElementById('timer-icon');
+  if (timerRunning){
+    bar.classList.add('running');
+    icon.innerHTML = '<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>';
+    timerInterval = setInterval(() => {
+      timerSeconds++;
+      updateTimerDisplay();
+    }, 1000);
+  } else {
+    bar.classList.remove('running');
+    icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none"/>';
+    clearInterval(timerInterval);
+  }
+}
+
+function timerReset(){
+  timerSeconds = 0;
+  timerRunning = false;
+  clearInterval(timerInterval);
+  document.getElementById('timer-bar').classList.remove('running');
+  document.getElementById('timer-icon').innerHTML = '<polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none"/>';
+  updateTimerDisplay();
+}
+
+function updateTimerDisplay(){
+  const h = Math.floor(timerSeconds / 3600);
+  const m = Math.floor((timerSeconds % 3600) / 60);
+  const s = timerSeconds % 60;
+  document.getElementById('timer-display').textContent =
+    `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+/* ═══════════════════════════════════════════════════════
+   RESET CHECKLIST
+═══════════════════════════════════════════════════════ */
+function resetChecklist(){
+  // Uncheck all options in current mode without deleting them
+  if (MODES[currentMode]){
+    MODES[currentMode].items = MODES[currentMode].items.map(item =>
+      typeof item === 'string' ? item : { ...item, checked: false }
+    );
+  }
+  renderOptions();
+  playSound('reset');
+  autoSave();
+}
+
+/* ═══════════════════════════════════════════════════════
+   SOUND ALERTS
+═══════════════════════════════════════════════════════ */
+function playSound(type){
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+
+    if (type === 'complete'){
+      // Two-tone "done" chime
+      osc.frequency.setValueAtTime(660, ctx.currentTime);
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      osc.start(); osc.stop(ctx.currentTime + 0.5);
+    } else if (type === 'check'){
+      osc.frequency.setValueAtTime(520, ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+      osc.start(); osc.stop(ctx.currentTime + 0.18);
+    } else if (type === 'reset'){
+      osc.frequency.setValueAtTime(330, ctx.currentTime);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.start(); osc.stop(ctx.currentTime + 0.25);
+    }
+  } catch(e){}
+}
+
+/* ═══════════════════════════════════════════════════════
+   NOTES
+═══════════════════════════════════════════════════════ */
+let notesOpen = false;
+function toggleNotes(){
+  notesOpen = !notesOpen;
+  document.getElementById('notes-area').classList.toggle('open', notesOpen);
+  document.getElementById('notes-toggle').classList.toggle('open', notesOpen);
+  if (notesOpen) {
+    loadNotes();
+    setTimeout(() => {
+      if (window.electronAPI) {
+        const card = document.getElementById('card');
+        window.electronAPI.setHeight(card.offsetHeight);
+      }
+    }, 320);
+  }
+}
+function loadNotes(){
+  const key = 'fm_notes_' + currentMode;
+  document.getElementById('notes-textarea').value = localStorage.getItem(key) || '';
+}
+function saveNotes(){
+  const key = 'fm_notes_' + currentMode;
+  localStorage.setItem(key, document.getElementById('notes-textarea').value);
+}
 
 /* ─── Icon Library (Glossary) ───────────────────────── */
 const ICON_LIBRARY = {
@@ -731,7 +1092,15 @@ function renderOptions(mode, forceIdx){
     li.addEventListener('click',e=>{
       if(e.target===del)return;
       if(editMode){span.style.display='none';inp.style.display='block';inp.focus();inp.select();}
-      else{document.querySelectorAll('.option').forEach(o=>o.classList.remove('selected'));li.classList.add('selected');}
+      else{
+        document.querySelectorAll('.option').forEach(o=>o.classList.remove('selected'));
+        li.classList.add('selected');
+        playSound('check');
+        // Check if all items are now selected — play complete sound
+        const total = document.querySelectorAll('#options-list .option').length;
+        const done  = document.querySelectorAll('#options-list .option.selected').length;
+        if(done >= total) setTimeout(()=>playSound('complete'), 120);
+      }
     });
     list.appendChild(li);
   });
@@ -756,7 +1125,7 @@ function switchMode(mode,btn){
   applyAccent(mode);
   const t=document.getElementById('mode-title'),l=document.getElementById('options-list');
   t.classList.add('switching'); l.classList.add('switching');
-  setTimeout(()=>{t.textContent=MODES[mode].title;renderOptions(mode);t.classList.remove('switching');l.classList.remove('switching');},180);
+  setTimeout(()=>{t.textContent=MODES[mode].title;renderOptions(mode);t.classList.remove('switching');l.classList.remove('switching');loadNotes();},180);
 }
 
 /* ─── Scale handle ────────────────────────────────────── */
@@ -881,10 +1250,9 @@ if (window.electronAPI) {
 function saveState(){
   localStorage.setItem('fm_modes',       JSON.stringify(MODES));
   localStorage.setItem('fm_mode',        currentMode);
-  localStorage.setItem('fm_theme',       isLight ? '1' : '0');
+  localStorage.setItem('fm_theme',       currentTheme);
   localStorage.setItem('fm_width',       document.getElementById('card').offsetWidth);
   localStorage.setItem('fm_icons',       JSON.stringify(iconAssignments));
-  // save selected index per mode
   const sel = document.querySelector('#options-list .option.selected');
   const idx = sel ? [...document.querySelectorAll('#options-list .option')].indexOf(sel) : 0;
   localStorage.setItem('fm_sel_'+currentMode, idx);
@@ -895,39 +1263,35 @@ function loadState(){
     const saved = localStorage.getItem('fm_modes');
     if(saved){
       const parsed = JSON.parse(saved);
-      // only restore titles + options, never accent/soft (keep hardcoded colors)
       Object.keys(parsed).forEach(k=>{
         if(MODES[k]){
           if(parsed[k].title)   MODES[k].title   = parsed[k].title;
           if(parsed[k].options) MODES[k].options = parsed[k].options;
+          if(parsed[k].items)   MODES[k].items   = parsed[k].items;
         }
       });
     }
   } catch(e){}
   const mode = localStorage.getItem('fm_mode');
   if(mode && MODES[mode]) currentMode = mode;
-  isLight = localStorage.getItem('fm_theme') === '1';
+  const savedTheme = localStorage.getItem('fm_theme') || 'dark';
+  currentTheme = savedTheme;
   try{
     const savedIcons = localStorage.getItem('fm_icons');
     if(savedIcons) iconAssignments = {...iconAssignments, ...JSON.parse(savedIcons)};
   }catch(e){}
 }
 
-// Auto-save on any meaningful action
 function autoSave(){ requestAnimationFrame(saveState); }
 
 /* ─── Init ───────────────────────────────────────────── */
-// Clear stale accent data from older saves
 try{ const s=localStorage.getItem('fm_modes'); if(s&&JSON.parse(s)?.alerts?.accent?.includes('220,90')) localStorage.removeItem('fm_modes'); }catch(e){}
 loadState();
 
-// Restore theme
-if(isLight){
-  document.getElementById('card').classList.add('light');
-  document.getElementById('theme-knob').innerHTML = `<svg id="theme-icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
-}
+// Apply saved theme
+setTheme(currentTheme);
 
-// Restore icons from saved assignments
+// Restore icons
 initIcons();
 
 // Restore active icon button
@@ -943,16 +1307,15 @@ const savedIdx = parseInt(localStorage.getItem('fm_sel_'+currentMode)) || Math.m
 renderOptions(currentMode, savedIdx);
 applyAccent(currentMode);
 
-// Restore card width
-const savedW = parseInt(localStorage.getItem('fm_width'));
-if(savedW && savedW >= 220 && savedW <= 520){
-  // defer so DOM is ready
-  setTimeout(()=>{ if(window._afterRender) window._afterRender(); }, 50);
-}
-
 // Hook auto-save into user actions
 document.addEventListener('click',    autoSave);
 document.addEventListener('touchend', autoSave);
+
+// Check license on startup (Electron only)
+checkLicense();
+
+// Load notes for current mode
+loadNotes();
 
 if('serviceWorker' in navigator){
   const sw=`self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>caches.match(e.request))));`;
