@@ -28,11 +28,6 @@ let currentScale = 1;
 const BASE_W   = 360;
 const BASE_H   = 580;
 const MAX_SCALE = 1.8;
-const EXPAND_W = Math.ceil(BASE_W * MAX_SCALE) + 40;
-const EXPAND_H = Math.ceil(BASE_H * MAX_SCALE) + 40;
-
-// Center point saved before expand so shrink lands exactly
-let scaleCX = 0, scaleCY = 0;
 
 function winW(scale) { return Math.round(BASE_W * scale); }
 function winH(scale) { return Math.round(BASE_H * scale); }
@@ -110,32 +105,24 @@ ipcMain.on('drag-end', () => {
   saveWindowState({ x, y, w, h, scale: currentScale });
 });
 
-/* ── SCALE: expand before drag, shrink after — anchored to center ── */
-ipcMain.on('scale-start', () => {
-  if (!mainWin) return;
-  const [x, y] = mainWin.getPosition();
-  const [w, h] = mainWin.getSize();
-  scaleCX = x + w / 2;
-  scaleCY = y + h / 2;
-  mainWin.setBounds({
-    x: Math.round(scaleCX - EXPAND_W / 2),
-    y: Math.round(scaleCY - EXPAND_H / 2),
-    width: EXPAND_W, height: EXPAND_H,
-  }, false);
-});
-
+/* ── SCALE: resize once on mouseup, centered on current window ── */
 ipcMain.on('scale-end', (e, scale) => {
   if (!mainWin) return;
   currentScale = scale;
-  const nw = winW(scale), nh = winH(scale);
+  const [x, y] = mainWin.getPosition();
+  const [w, h] = mainWin.getSize();
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const nw = winW(scale);
+  const nh = winH(scale);
   mainWin.setBounds({
-    x: Math.round(scaleCX - nw / 2),
-    y: Math.round(scaleCY - nh / 2),
+    x: Math.round(cx - nw / 2),
+    y: Math.round(cy - nh / 2),
     width: nw, height: nh,
   }, false);
   saveWindowState({
-    x: Math.round(scaleCX - nw / 2),
-    y: Math.round(scaleCY - nh / 2),
+    x: Math.round(cx - nw / 2),
+    y: Math.round(cy - nh / 2),
     w: nw, h: nh, scale,
   });
 });

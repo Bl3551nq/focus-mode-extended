@@ -381,22 +381,12 @@ body.editing .icon-btn::after{
 .update-install-btn:hover{ background:rgba(255,255,255,0.35); }
 .update-install-btn.downloading{ opacity:0.6; pointer-events:none; }
 .card.light .update-banner{ background:linear-gradient(135deg,rgba(80,20,200,0.95),rgba(160,10,60,0.95)); }
-/* ── Native OS drag regions ── */
-.top-bar {
-  cursor: grab;
-}
-.top-bar:active {
-  cursor: grabbing;
-}
+/* ── Drag cursor only applied via JS during actual mousedown ── */
 .drag-corner{
   position:absolute; bottom:0; left:0;
   width:60px; height:60px;
   border-radius:0 0 0 28px;
   z-index:20;
-  cursor: grab;
-}
-.drag-corner:active {
-  cursor: grabbing;
 }
 /* Interactive elements keep pointer cursor */
 button, input, .option, .icon-btn, .edit-toggle, .close-btn,
@@ -815,7 +805,7 @@ function switchMode(mode,btn){
     startX = sx;
     startS = parseFloat(card.style.zoom) || 1;
     document.body.style.userSelect = 'none';
-    if (window.electronAPI) window.electronAPI.scaleStart();
+    // No scaleStart — window only resizes once on mouseup, no jump
   }
   function moveDrag(sx){
     if(!dragging) return;
@@ -844,7 +834,7 @@ function switchMode(mode,btn){
 
   function startDrag(e) {
     // Skip interactive elements
-    if (e.target.closest('button, input, .option, .icon-btn, .theme-switch, .minimize-bar, .resize-handle, .scroll-area, .add-btn, .icon-picker, select, a')) return;
+    if (e.target.closest('button, input, .option, .icon-btn, .icons, .theme-switch, .minimize-bar, .resize-handle, .scroll-area, .add-btn, .icon-picker, select, a, .top-bar-right, .minimize-pill')) return;
     dragging = true;
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'grabbing';
