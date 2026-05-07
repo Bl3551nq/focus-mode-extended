@@ -98,7 +98,25 @@ function createWindow(){
   mainWin.setIgnoreMouseEvents(true,{forward:true});
 
   mainWin.loadFile(path.join(__dirname,'src','index.html'));
-  mainWin.once('ready-to-show',()=>{mainWin.show();mainWin.focus();startHitPoll();});
+  mainWin.once('ready-to-show',()=>{
+    mainWin.show();
+    mainWin.focus();
+    startHitPoll();
+    // Force clear stale renderer localStorage on every launch
+    mainWin.webContents.once('did-finish-load', () => {
+      mainWin.webContents.executeJavaScript(`
+        (function(){
+          const ver = localStorage.getItem('fm_state_ver');
+          if(ver !== '3'){
+            const keys = Object.keys(localStorage).filter(k => k.startsWith('fm_'));
+            keys.forEach(k => localStorage.removeItem(k));
+            localStorage.setItem('fm_state_ver','3');
+            location.reload();
+          }
+        })();
+      `);
+    });
+  });
   mainWin.on('close',e=>{if(!app.isQuitting){e.preventDefault();mainWin.hide();isHidden=true;}});
   mainWin.on('closed',()=>{mainWin=null;});
   ['move'].forEach(ev=>mainWin.on(ev,()=>{
