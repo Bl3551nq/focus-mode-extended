@@ -1085,15 +1085,28 @@ function saveState(){
 }
 
 function loadState(){
+  // Clear stale data from old incompatible builds
+  const stateVer = localStorage.getItem('fm_state_ver');
+  if(stateVer !== '3'){
+    ['fm_modes','fm_mode','fm_theme','fm_scale','fm_icons','fm_width'].forEach(k=>localStorage.removeItem(k));
+    Object.keys(MODES).forEach(m=>localStorage.removeItem('fm_sel_'+m));
+    localStorage.setItem('fm_state_ver','3');
+    return; // use fresh defaults
+  }
   try{
     const saved = localStorage.getItem('fm_modes');
     if(saved){
       const parsed = JSON.parse(saved);
       Object.keys(parsed).forEach(k=>{
-        if(MODES[k]){
-          if(parsed[k].title)   MODES[k].title   = parsed[k].title;
-          if(parsed[k].options) MODES[k].options = parsed[k].options;
-          if(parsed[k].items)   MODES[k].items   = parsed[k].items;
+        if(!MODES[k]) return;
+        // Only restore title if valid string
+        if(typeof parsed[k].title === 'string' && parsed[k].title.length > 0){
+          MODES[k].title = parsed[k].title;
+        }
+        // Only restore options if valid non-empty array of strings
+        if(Array.isArray(parsed[k].options) && parsed[k].options.length > 0
+           && parsed[k].options.every(o => typeof o === 'string')){
+          MODES[k].options = parsed[k].options;
         }
       });
     }
